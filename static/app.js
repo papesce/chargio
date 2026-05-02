@@ -28,6 +28,36 @@ function minutesLabel(minutes) {
   return `${hours}h ${mins}m`;
 }
 
+function estimateDischargeMinutes(sample, samples) {
+  if (!sample || sample.external_connected || sample.percent === null || sample.percent === undefined) {
+    return null;
+  }
+  if (!Array.isArray(samples) || samples.length < 2) return null;
+
+  const unplugged = samples.filter((item) => (
+    item
+    && !item.external_connected
+    && item.percent !== null
+    && item.percent !== undefined
+  ));
+  if (unplugged.length < 2) return null;
+
+  const first = unplugged[0];
+  const last = unplugged[unplugged.length - 1];
+  const startMs = new Date(first.sampled_at).getTime();
+  const endMs = new Date(last.sampled_at).getTime();
+  const elapsedMinutes = (endMs - startMs) / 60000;
+  if (!Number.isFinite(elapsedMinutes) || elapsedMinutes <= 0) return null;
+
+  const percentDrop = Number(first.percent) - Number(last.percent);
+  if (!Number.isFinite(percentDrop) || percentDrop <= 0) return null;
+
+  const dropPerMinute = percentDrop / elapsedMinutes;
+  if (!Number.isFinite(dropPerMinute) || dropPerMinute <= 0) return null;
+
+  return Math.round(Number(sample.percent) / dropPerMinute);
+}
+
 async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
@@ -49,7 +79,7 @@ function activeFilters(filters) {
   return labels;
 }
 
-function updateCurrent(sample, collectorError, collectorStatus) {
+function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   if (!sample) {
     $("subtitle").textContent = collectorError || "No samples yet";
     return;
@@ -69,7 +99,14 @@ function updateCurrent(sample, collectorError, collectorStatus) {
   $("capacity").textContent = `${fmtInt(sample.current_capacity)} / ${fmtInt(sample.max_capacity)} mAh`;
   $("temperature").textContent = fmt(sample.temperature_c, " C", 1);
   $("cycles").textContent = `${fmtInt(sample.cycle_count)} cycles`;
-  $("remaining").textContent = minutesLabel(sample.time_remaining_min);
+  const unpluggedEstimate = estimateDischargeMinutes(sample, samples);
+  if (!sample.external_connected) {
+    const estimate = unpluggedEstimate ?? sample.time_remaining_min;
+    const label = minutesLabel(estimate);
+    $("remaining").textContent = label === "--" ? "--" : `${label} est`;
+  } else {
+    $("remaining").textContent = minutesLabel(sample.time_remaining_min);
+  }
   $("sampled").textContent = `sampled ${localTime(sample.sampled_at)}`;
   const filters = activeFilters(collectorStatus?.filters);
   const recordingText = collectorStatus?.last_skip_reason
@@ -209,7 +246,7 @@ async function refresh() {
       fetchJson(`/api/history?seconds=${state.seconds}`),
     ]);
     state.samples = history.samples || [];
-    updateCurrent(current.sample, current.collector_error, current.collector_status);
+    updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples);
     updateCharts();
   } catch (error) {
     $("subtitle").textContent = error.message;
