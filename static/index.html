@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Battery Monitor</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Battery Monitor</h1>
+        <p id="subtitle">Waiting for samples</p>
+      </div>
+      <div class="controls" aria-label="History range">
+        <button class="range active" data-seconds="3600">1h</button>
+        <button class="range" data-seconds="21600">6h</button>
+        <button class="range" data-seconds="86400">24h</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="status-grid" aria-label="Current battery metrics">
+        <article class="metric primary">
+          <span>Battery</span>
+          <strong id="percent">--</strong>
+          <small id="state">--</small>
+        </article>
+        <article class="metric">
+          <span>Battery Power</span>
+          <strong id="power">--</strong>
+          <small id="amperage">--</small>
+        </article>
+        <article class="metric">
+          <span>Adapter</span>
+          <strong id="adapter">--</strong>
+          <small id="adapter-detail">--</small>
+        </article>
+        <article class="metric">
+          <span>Voltage</span>
+          <strong id="voltage">--</strong>
+          <small id="capacity">--</small>
+        </article>
+        <article class="metric">
+          <span>Temperature</span>
+          <strong id="temperature">--</strong>
+          <small id="cycles">--</small>
+        </article>
+        <article class="metric">
+          <span>Time</span>
+          <strong id="remaining">--</strong>
+          <small id="sampled">--</small>
+        </article>
+      </section>
+
+      <section class="diagnosis">
+        <h2>Charging Diagnosis</h2>
+        <div id="diagnosis">Collecting enough data to diagnose charging behavior.</div>
+      </section>
+
+      <section class="charts">
+        <article class="chart-panel">
+          <div class="chart-head">
+            <h2>Power</h2>
+            <span>watts</span>
+          </div>
+          <canvas id="powerChart" width="1200" height="360"></canvas>
+        </article>
+        <article class="chart-panel">
+          <div class="chart-head">
+            <h2>Battery</h2>
+            <span>percent</span>
+          </div>
+          <canvas id="percentChart" width="1200" height="300"></canvas>
+        </article>
+        <article class="chart-panel">
+          <div class="chart-head">
+            <h2>Temperature</h2>
+            <span>celsius</span>
+          </div>
+          <canvas id="tempChart" width="1200" height="300"></canvas>
+        </article>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
