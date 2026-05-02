@@ -30,6 +30,20 @@ Run on a different port or interval:
 python3 battery_app.py --port 8787 --interval 2
 ```
 
+Record history only inside a battery percentage range:
+
+```bash
+python3 battery_app.py --record-min-percent 20 --record-max-percent 80
+```
+
+Record only samples where battery power is at least 10W in either direction:
+
+```bash
+python3 battery_app.py --record-min-abs-power 10
+```
+
+Filters only affect SQLite history. The dashboard still shows the current live battery sample.
+
 ## Notes
 
 Battery watts are derived from battery voltage and amperage. Adapter wattage is the charger capability macOS reports, not the amount entering the battery. At higher percentages, elevated temperatures, or with optimized charging enabled, observed charging watts can be much lower than the adapter rating.

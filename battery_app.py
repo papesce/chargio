@@ -99,6 +99,12 @@ def int_or_none(value):
         return None
 
 
+def signed_64(value):
+    if value is not None and value >= 2**63:
+        return value - 2**64
+    return value
+
+
 def parse_top_level_fields(output):
     data = {}
     for line in output.splitlines():
@@ -146,8 +152,8 @@ def collect_sample():
     battery_data = parse_inline_object(output, "BatteryData")
 
     voltage_mv = int_or_none(fields.get("Voltage"))
-    amperage_ma = int_or_none(fields.get("Amperage"))
-    instant_amperage_ma = int_or_none(fields.get("InstantAmperage"))
+    amperage_ma = signed_64(int_or_none(fields.get("Amperage")))
+    instant_amperage_ma = signed_64(int_or_none(fields.get("InstantAmperage")))
     current_capacity = int_or_none(fields.get("CurrentCapacity"))
     max_capacity = int_or_none(fields.get("MaxCapacity"))
 
@@ -263,18 +269,61 @@ def history_samples(path, seconds):
 
 
 class Collector(threading.Thread):
-    def __init__(self, db_path, interval):
+    def __init__(self, db_path, interval, min_percent=None, max_percent=None, min_abs_power=None):
         super().__init__(daemon=True)
         self.db_path = db_path
         self.interval = interval
+        self.min_percent = min_percent
+        self.max_percent = max_percent
+        self.min_abs_power = min_abs_power
         self.stop_event = threading.Event()
         self.last_error = None
+        self.last_sample = None
+        self.last_recorded_at = None
+        self.skipped_count = 0
+        self.recorded_count = 0
+        self.last_skip_reason = None
+
+    def skip_reason(self, sample):
+        percent = sample.get("percent")
+        power_w = sample.get("power_w")
+
+        if self.min_percent is not None and percent is not None and percent < self.min_percent:
+            return f"below {self.min_percent:g}% minimum"
+        if self.max_percent is not None and percent is not None and percent > self.max_percent:
+            return f"above {self.max_percent:g}% maximum"
+        if self.min_abs_power is not None and power_w is not None and abs(power_w) < self.min_abs_power:
+            return f"below {self.min_abs_power:g}W absolute power minimum"
+        return None
+
+    def status(self):
+        return {
+            "recorded_count": self.recorded_count,
+            "skipped_count": self.skipped_count,
+            "last_recorded_at": self.last_recorded_at,
+            "last_skip_reason": self.last_skip_reason,
+            "filters": {
+                "min_percent": self.min_percent,
+                "max_percent": self.max_percent,
+                "min_abs_power": self.min_abs_power,
+            },
+        }
 
     def run(self):
         while not self.stop_event.is_set():
             started = time.time()
             try:
-                insert_sample(self.db_path, collect_sample())
+                sample = collect_sample()
+                self.last_sample = sample
+                reason = self.skip_reason(sample)
+                if reason:
+                    self.skipped_count += 1
+                    self.last_skip_reason = reason
+                else:
+                    insert_sample(self.db_path, sample)
+                    self.recorded_count += 1
+                    self.last_recorded_at = sample["sampled_at"]
+                    self.last_skip_reason = None
                 self.last_error = None
             except Exception as exc:
                 self.last_error = str(exc)
@@ -326,9 +375,11 @@ class AppHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
 
         if parsed.path == "/api/current":
+            live_sample = self.collector.last_sample if self.collector else None
             self.send_json({
-                "sample": latest_sample(self.db_path),
+                "sample": live_sample or latest_sample(self.db_path),
                 "collector_error": self.collector.last_error if self.collector else None,
+                "collector_status": self.collector.status() if self.collector else None,
             }, head_only=head_only)
             return
 
@@ -363,9 +414,9 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)
 
 
-def run_server(host, port, interval, db_path):
+def run_server(host, port, interval, db_path, min_percent=None, max_percent=None, min_abs_power=None):
     init_db(db_path)
-    collector = Collector(db_path, interval)
+    collector = Collector(db_path, interval, min_percent, max_percent, min_abs_power)
     collector.start()
 
     AppHandler.db_path = db_path
@@ -381,6 +432,14 @@ def run_server(host, port, interval, db_path):
 
     print(f"Battery monitor running at http://{host}:{port}")
     print(f"SQLite history: {db_path}")
+    if any(value is not None for value in (min_percent, max_percent, min_abs_power)):
+        print("Recording filters:")
+        if min_percent is not None:
+            print(f"  minimum battery percent: {min_percent:g}%")
+        if max_percent is not None:
+            print(f"  maximum battery percent: {max_percent:g}%")
+        if min_abs_power is not None:
+            print(f"  minimum absolute battery power: {min_abs_power:g}W")
     try:
         server.serve_forever()
     finally:
@@ -400,6 +459,9 @@ def main():
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--interval", type=float, default=5.0)
     parser.add_argument("--db", type=Path, default=DB_PATH)
+    parser.add_argument("--record-min-percent", type=float, help="only store samples at or above this battery percent")
+    parser.add_argument("--record-max-percent", type=float, help="only store samples at or below this battery percent")
+    parser.add_argument("--record-min-abs-power", type=float, help="only store samples at or above this absolute battery power in watts")
     parser.add_argument("--once", action="store_true", help="print one sample and exit")
     args = parser.parse_args()
 
@@ -407,7 +469,22 @@ def main():
         print_once()
         return
 
-    run_server(args.host, args.port, args.interval, args.db)
+    if (
+        args.record_min_percent is not None
+        and args.record_max_percent is not None
+        and args.record_min_percent > args.record_max_percent
+    ):
+        parser.error("--record-min-percent cannot be greater than --record-max-percent")
+
+    run_server(
+        args.host,
+        args.port,
+        args.interval,
+        args.db,
+        args.record_min_percent,
+        args.record_max_percent,
+        args.record_min_abs_power,
+    )
 
 
 if __name__ == "__main__":

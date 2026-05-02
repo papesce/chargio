@@ -34,7 +34,22 @@ async function fetchJson(url) {
   return response.json();
 }
 
-function updateCurrent(sample, collectorError) {
+function activeFilters(filters) {
+  if (!filters) return [];
+  const labels = [];
+  if (filters.min_percent !== null && filters.min_percent !== undefined) {
+    labels.push(`>= ${filters.min_percent}%`);
+  }
+  if (filters.max_percent !== null && filters.max_percent !== undefined) {
+    labels.push(`<= ${filters.max_percent}%`);
+  }
+  if (filters.min_abs_power !== null && filters.min_abs_power !== undefined) {
+    labels.push(`>= ${filters.min_abs_power}W abs`);
+  }
+  return labels;
+}
+
+function updateCurrent(sample, collectorError, collectorStatus) {
   if (!sample) {
     $("subtitle").textContent = collectorError || "No samples yet";
     return;
@@ -56,7 +71,12 @@ function updateCurrent(sample, collectorError) {
   $("cycles").textContent = `${fmtInt(sample.cycle_count)} cycles`;
   $("remaining").textContent = minutesLabel(sample.time_remaining_min);
   $("sampled").textContent = `sampled ${localTime(sample.sampled_at)}`;
-  $("subtitle").textContent = collectorError || `Last sample ${localTime(sample.sampled_at)}`;
+  const filters = activeFilters(collectorStatus?.filters);
+  const recordingText = collectorStatus?.last_skip_reason
+    ? `live ${localTime(sample.sampled_at)}; not recording, ${collectorStatus.last_skip_reason}`
+    : `live ${localTime(sample.sampled_at)}; recording`;
+  const filterText = filters.length ? ` (${filters.join(", ")})` : "";
+  $("subtitle").textContent = collectorError || `${recordingText}${filterText}`;
   updateDiagnosis(sample);
 }
 
@@ -189,7 +209,7 @@ async function refresh() {
       fetchJson(`/api/history?seconds=${state.seconds}`),
     ]);
     state.samples = history.samples || [];
-    updateCurrent(current.sample, current.collector_error);
+    updateCurrent(current.sample, current.collector_error, current.collector_status);
     updateCharts();
   } catch (error) {
     $("subtitle").textContent = error.message;
