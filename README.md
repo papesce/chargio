@@ -2,6 +2,9 @@
 
 Local macOS battery and charger monitor with near-real-time charts.
 
+<img width="1434" height="1044" alt="Screenshot 2026-05-02 at 6 38 31 PM" src="https://github.com/user-attachments/assets/c097fa4b-3394-409b-9f0d-fa5da1b74305" />
+
+
 ## Run
 
 ```bash
