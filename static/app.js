@@ -1,7 +1,10 @@
 const state = {
   seconds: 3600,
   samples: [],
+  collectorStatus: null,
 };
+
+const TEMP_COMFORT_MAX_C = 38;
 
 const $ = (id) => document.getElementById(id);
 
@@ -26,6 +29,99 @@ function minutesLabel(minutes) {
   const mins = minutes % 60;
   if (hours <= 0) return `${mins}m`;
   return `${hours}h ${mins}m`;
+}
+
+function formatDurationMs(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return "--";
+  if (ms === 0) return "0";
+  const totalSec = Math.round(ms / 1000);
+  if (totalSec < 1) return "<1s";
+  if (totalSec < 60) return `${totalSec}s`;
+  const m = Math.floor(totalSec / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h}h ${rm}m` : `${h}h`;
+}
+
+function formatGapMs(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return "--";
+  if (ms < 120000) return `${Math.round(ms / 1000)}s`;
+  return formatDurationMs(ms);
+}
+
+function formatDeltaPercent(delta) {
+  if (delta === null || delta === undefined || Number.isNaN(Number(delta))) return "--";
+  const n = Number(delta);
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(1)}%`;
+}
+
+function chargeDischargeFromPower(samples, eps = 0.05) {
+  const empty = {
+    chargeMs: 0,
+    dischargeMs: 0,
+    idleMs: 0,
+    deltaPercent: null,
+    avgChargeW: null,
+    avgDischargeW: null,
+  };
+  if (!samples || samples.length < 2) return empty;
+
+  let chargeMs = 0;
+  let dischargeMs = 0;
+  let idleMs = 0;
+  let sumChargeW = 0;
+  let sumDisW = 0;
+
+  for (let i = 0; i < samples.length - 1; i += 1) {
+    const a = samples[i];
+    const b = samples[i + 1];
+    const dt = new Date(b.sampled_at).getTime() - new Date(a.sampled_at).getTime();
+    if (!Number.isFinite(dt) || dt <= 0) continue;
+    const pa = a.power_w;
+    const pb = b.power_w;
+    if (pa === null || pa === undefined || pb === null || pb === undefined) {
+      idleMs += dt;
+      continue;
+    }
+    const mid = (Number(pa) + Number(pb)) / 2;
+    if (mid > eps) {
+      chargeMs += dt;
+      sumChargeW += mid * dt;
+    } else if (mid < -eps) {
+      dischargeMs += dt;
+      sumDisW += mid * dt;
+    } else {
+      idleMs += dt;
+    }
+  }
+
+  const pFirst = samples[0].percent;
+  const pLast = samples[samples.length - 1].percent;
+  const deltaPercent = (pFirst !== null && pFirst !== undefined && pLast !== null && pLast !== undefined
+    && !Number.isNaN(Number(pFirst)) && !Number.isNaN(Number(pLast)))
+    ? Number(pLast) - Number(pFirst)
+    : null;
+
+  return {
+    chargeMs,
+    dischargeMs,
+    idleMs,
+    deltaPercent,
+    avgChargeW: chargeMs > 0 ? sumChargeW / chargeMs : null,
+    avgDischargeW: dischargeMs > 0 ? sumDisW / dischargeMs : null,
+  };
+}
+
+function maxSampleGapMs(samples) {
+  if (!samples || samples.length < 2) return null;
+  let maxGap = 0;
+  for (let i = 1; i < samples.length; i += 1) {
+    const dt = new Date(samples[i].sampled_at).getTime() - new Date(samples[i - 1].sampled_at).getTime();
+    if (Number.isFinite(dt) && dt > maxGap) maxGap = dt;
+  }
+  return maxGap;
 }
 
 function estimateDischargeMinutes(sample, samples) {
@@ -155,6 +251,24 @@ function series(samples, key) {
   return samples
     .map((sample) => ({ x: new Date(sample.sampled_at), y: sample[key] }))
     .filter((point) => point.y !== null && point.y !== undefined && !Number.isNaN(Number(point.y)));
+}
+
+function batterySeries(samples) {
+  if (!Array.isArray(samples)) return [];
+  return samples
+    .map((sample) => ({
+      x: new Date(sample.sampled_at),
+      y: sample.percent,
+      isCharging: Boolean(sample.is_charging),
+      externalConnected: Boolean(sample.external_connected),
+    }))
+    .filter((point) => point.y !== null && point.y !== undefined && !Number.isNaN(Number(point.y)));
+}
+
+function batterySegmentCategory(point) {
+  if (point.isCharging) return "charge";
+  if (!point.externalConnected) return "battery";
+  return "external";
 }
 
 function drawChart(canvasId, points, options = {}) {
@@ -297,6 +411,26 @@ function expandPowerPointsWithZeroCrossings(points) {
         const t1 = b.x.getTime();
         const crossT = t0 + (t1 - t0) * (y0 / (y0 - y1));
         out.push({ x: new Date(crossT), y: 0 });
+      }
+    }
+  }
+  return out;
+}
+
+function expandTempPointsAtThreshold(points, threshold) {
+  const out = [];
+  for (let i = 0; i < points.length; i += 1) {
+    out.push(points[i]);
+    if (i < points.length - 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      const y0 = Number(a.y);
+      const y1 = Number(b.y);
+      if (y0 !== y1 && (y0 - threshold) * (y1 - threshold) < 0) {
+        const t0 = a.x.getTime();
+        const t1 = b.x.getTime();
+        const crossT = t0 + (t1 - t0) * ((y0 - threshold) / (y0 - y1));
+        out.push({ x: new Date(crossT), y: threshold });
       }
     }
   }
@@ -462,6 +596,334 @@ function drawPowerChart(canvasId, points) {
   ctx.textAlign = "left";
 }
 
+function drawBatteryChart(canvasId, points) {
+  const canvas = $(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(320, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(180, Math.floor(rect.height * dpr));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+  const pad = { top: 16, right: 18, bottom: 28, left: 48 };
+  ctx.clearRect(0, 0, width, height);
+
+  const styles = getComputedStyle(document.documentElement);
+  const line = styles.getPropertyValue("--line").trim();
+  const text = styles.getPropertyValue("--muted").trim();
+  const chargeRgb = themeRgb("--good");
+  const onBatteryRgb = themeRgb("--warn");
+  const externalRgb = themeRgb("--accent");
+  const mutedRgb = themeRgb("--muted");
+
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillStyle = text;
+
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+
+  if (points.length < 2) {
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    ctx.fillText("Collecting samples", pad.left, pad.top + 24);
+    return;
+  }
+
+  const minX = Math.min(...points.map((p) => p.x.getTime()));
+  const maxX = Math.max(...points.map((p) => p.x.getTime()));
+  const minY = 0;
+  const maxY = 100;
+
+  const xToPx = (t) => pad.left + ((t - minX) / Math.max(1, maxX - minX)) * plotW;
+  const yToPy = (y) => pad.top + (1 - ((Number(y) - minY) / (maxY - minY))) * plotH;
+
+  const yTop = yToPy(100);
+  const y80 = yToPy(80);
+  const y20 = yToPy(20);
+  const baseY = yToPy(0);
+
+  function rgbForCategory(category) {
+    if (category === "charge") return chargeRgb;
+    if (category === "battery") return onBatteryRgb;
+    return externalRgb;
+  }
+
+  function categoryAlongEdge(p0, p1) {
+    const c0 = batterySegmentCategory(p0);
+    const c1 = batterySegmentCategory(p1);
+    return c0 === c1 ? c0 : c1;
+  }
+
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad.top + (plotH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
+    ctx.stroke();
+    const label = maxY - ((maxY - minY) / 4) * i;
+    ctx.fillStyle = text;
+    ctx.fillText(`${Math.round(label)}%`, 6, y + 4);
+  }
+
+  ctx.fillStyle = rgba(chargeRgb, 0.06);
+  ctx.fillRect(pad.left, yTop, plotW, Math.max(0, y80 - yTop));
+  ctx.fillStyle = rgba(onBatteryRgb, 0.06);
+  ctx.fillRect(pad.left, y20, plotW, Math.max(0, baseY - y20));
+
+  ctx.save();
+  ctx.strokeStyle = powerSwitchMarkerStrokeStyle();
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 6]);
+  for (let i = 1; i < points.length; i += 1) {
+    if (batterySegmentCategory(points[i - 1]) !== batterySegmentCategory(points[i])) {
+      const x = xToPx(points[i].x.getTime());
+      ctx.beginPath();
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, pad.top + plotH);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const x0 = xToPx(p0.x.getTime());
+    const x1 = xToPx(p1.x.getTime());
+    const py0 = yToPy(p0.y);
+    const py1 = yToPy(p1.y);
+    const cat = categoryAlongEdge(p0, p1);
+    ctx.fillStyle = rgba(rgbForCategory(cat), 0.18);
+    ctx.beginPath();
+    ctx.moveTo(x0, py0);
+    ctx.lineTo(x1, py1);
+    ctx.lineTo(x1, baseY);
+    ctx.lineTo(x0, baseY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = rgba(mutedRgb, 0.35);
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(pad.left, y20);
+  ctx.lineTo(width - pad.right, y20);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(pad.left, y80);
+  ctx.lineTo(width - pad.right, y80);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.lineWidth = 2;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const x0 = xToPx(p0.x.getTime());
+    const py0 = yToPy(p0.y);
+    const x1 = xToPx(p1.x.getTime());
+    const py1 = yToPy(p1.y);
+    const cat = categoryAlongEdge(p0, p1);
+    ctx.strokeStyle = rgba(rgbForCategory(cat), 1);
+    ctx.beginPath();
+    ctx.moveTo(x0, py0);
+    ctx.lineTo(x1, py1);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = text;
+  ctx.lineWidth = 1.75;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, baseY);
+  ctx.lineTo(width - pad.right, baseY);
+  ctx.stroke();
+  ctx.fillStyle = text;
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText("0%", width - pad.right - 4, baseY - 5);
+  ctx.textAlign = "left";
+  ctx.font = "12px system-ui, sans-serif";
+
+  const first = new Date(minX).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const last = new Date(maxX).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  ctx.fillStyle = text;
+  ctx.fillText(first, pad.left, height - 8);
+  ctx.textAlign = "right";
+  ctx.fillText(last, width - pad.right, height - 8);
+  ctx.textAlign = "left";
+}
+
+function drawTemperatureChart(canvasId, points) {
+  const canvas = $(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(320, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(180, Math.floor(rect.height * dpr));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+  const pad = { top: 16, right: 18, bottom: 28, left: 48 };
+  ctx.clearRect(0, 0, width, height);
+
+  const styles = getComputedStyle(document.documentElement);
+  const line = styles.getPropertyValue("--line").trim();
+  const text = styles.getPropertyValue("--muted").trim();
+  const goodRgb = themeRgb("--good");
+  const warnRgb = themeRgb("--warn");
+  const mutedRgb = themeRgb("--muted");
+
+  const safeC = TEMP_COMFORT_MAX_C;
+
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillStyle = text;
+
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+
+  if (points.length < 2) {
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    ctx.fillText("Collecting samples", pad.left, pad.top + 24);
+    return;
+  }
+
+  const ys = points.map((p) => Number(p.y));
+  let minData = Math.min(...ys);
+  let maxData = Math.max(...ys);
+  if (minData === maxData) {
+    minData -= 0.8;
+    maxData += 0.8;
+  }
+  const yPad = Math.max((maxData - minData) * 0.12, 0.4);
+  let minY = minData - yPad;
+  let maxY = maxData + yPad;
+  minY = Math.min(minY, safeC - 2);
+  maxY = Math.max(maxY, safeC + 2);
+
+  const expanded = expandTempPointsAtThreshold(points, safeC);
+  const minX = Math.min(...expanded.map((p) => p.x.getTime()));
+  const maxX = Math.max(...expanded.map((p) => p.x.getTime()));
+
+  const xToPx = (t) => pad.left + ((t - minX) / Math.max(1, maxX - minX)) * plotW;
+  const yToPy = (y) => pad.top + (1 - ((Number(y) - minY) / (maxY - minY))) * plotH;
+
+  const baselineY = yToPy(minY);
+  const ySafe = yToPy(safeC);
+
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad.top + (plotH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
+    ctx.stroke();
+    const label = maxY - ((maxY - minY) / 4) * i;
+    ctx.fillStyle = text;
+    ctx.fillText(`${label.toFixed(1)} °C`, 6, y + 4);
+  }
+
+  ctx.fillStyle = rgba(warnRgb, 0.08);
+  ctx.fillRect(pad.left, pad.top, plotW, Math.max(0, ySafe - pad.top));
+  ctx.fillStyle = rgba(goodRgb, 0.07);
+  ctx.fillRect(pad.left, ySafe, plotW, Math.max(0, pad.top + plotH - ySafe));
+
+  ctx.save();
+  ctx.strokeStyle = powerSwitchMarkerStrokeStyle();
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 6]);
+  for (let i = 1; i < points.length; i += 1) {
+    const y0 = Number(points[i - 1].y);
+    const y1 = Number(points[i].y);
+    if (y0 !== y1 && (y0 - safeC) * (y1 - safeC) < 0) {
+      const t0 = points[i - 1].x.getTime();
+      const t1 = points[i].x.getTime();
+      const crossT = t0 + (t1 - t0) * ((y0 - safeC) / (y0 - y1));
+      const x = xToPx(crossT);
+      ctx.beginPath();
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, pad.top + plotH);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  for (let i = 0; i < expanded.length - 1; i += 1) {
+    const p0 = expanded[i];
+    const p1 = expanded[i + 1];
+    const x0 = xToPx(p0.x.getTime());
+    const x1 = xToPx(p1.x.getTime());
+    const py0 = yToPy(p0.y);
+    const py1 = yToPy(p1.y);
+    const mid = (Number(p0.y) + Number(p1.y)) / 2;
+    ctx.fillStyle = mid >= safeC ? rgba(warnRgb, 0.18) : rgba(goodRgb, 0.18);
+    ctx.beginPath();
+    ctx.moveTo(x0, py0);
+    ctx.lineTo(x1, py1);
+    ctx.lineTo(x1, baselineY);
+    ctx.lineTo(x0, baselineY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = rgba(mutedRgb, 0.35);
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(pad.left, ySafe);
+  ctx.lineTo(width - pad.right, ySafe);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.lineWidth = 2;
+  for (let i = 0; i < expanded.length - 1; i += 1) {
+    const p0 = expanded[i];
+    const p1 = expanded[i + 1];
+    const x0 = xToPx(p0.x.getTime());
+    const py0 = yToPy(p0.y);
+    const x1 = xToPx(p1.x.getTime());
+    const py1 = yToPy(p1.y);
+    const mid = (Number(p0.y) + Number(p1.y)) / 2;
+    ctx.strokeStyle = mid >= safeC ? rgba(warnRgb, 1) : rgba(goodRgb, 1);
+    ctx.beginPath();
+    ctx.moveTo(x0, py0);
+    ctx.lineTo(x1, py1);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = text;
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, baselineY);
+  ctx.lineTo(width - pad.right, baselineY);
+  ctx.stroke();
+  ctx.fillStyle = text;
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(`${safeC} °C`, width - pad.right - 4, ySafe - 5);
+  ctx.textAlign = "left";
+  ctx.font = "12px system-ui, sans-serif";
+
+  const first = new Date(minX).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const last = new Date(maxX).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  ctx.fillStyle = text;
+  ctx.fillText(first, pad.left, height - 8);
+  ctx.textAlign = "right";
+  ctx.fillText(last, width - pad.right, height - 8);
+  ctx.textAlign = "left";
+}
+
 function powerChartExpanded() {
   const panel = $("powerChartFocus");
   return Boolean(panel && !panel.hidden);
@@ -484,14 +946,83 @@ function closePowerChartFocus() {
   updateCharts();
 }
 
+function updateSessionSidePanel(samples, collectorStatus) {
+  const setText = (id, text) => {
+    const el = $(id);
+    if (el) el.textContent = text;
+  };
+
+  const latestEl = $("tempStatLatest");
+  const minEl = $("tempStatMin");
+  const maxEl = $("tempStatMax");
+  const noteEl = $("tempStatNote");
+  if (!latestEl || !minEl || !maxEl) return;
+
+  if (!samples || !samples.length) {
+    setText("tempStatLatest", "--");
+    setText("tempStatMin", "--");
+    setText("tempStatMax", "--");
+    if (noteEl) noteEl.textContent = "No samples in this window yet.";
+    setText("sessionTimeCharge", "--");
+    setText("sessionTimeDischarge", "--");
+    setText("sessionAvgChargeW", "--");
+    setText("sessionAvgDischargeW", "--");
+    return;
+  }
+
+  const temps = samples
+    .map((s) => s.temperature_c)
+    .filter((v) => v !== null && v !== undefined && !Number.isNaN(Number(v)))
+    .map(Number);
+
+  const last = samples[samples.length - 1];
+  const latestVal = last.temperature_c;
+  setText("tempStatLatest", (latestVal !== null && latestVal !== undefined && !Number.isNaN(Number(latestVal)))
+    ? fmt(Number(latestVal), " °C", 1)
+    : "--");
+
+  if (!temps.length) {
+    setText("tempStatMin", "--");
+    setText("tempStatMax", "--");
+  } else {
+    setText("tempStatMin", fmt(Math.min(...temps), " °C", 1));
+    setText("tempStatMax", fmt(Math.max(...temps), " °C", 1));
+  }
+
+  if (noteEl) {
+    const n = temps.length;
+    const total = samples.length;
+    if (n === 0) {
+      noteEl.textContent = total
+        ? `No temperature readings in ${total} sample${total === 1 ? "" : "s"} for this range.`
+        : "No samples in this window yet.";
+    } else {
+      noteEl.textContent = n === total
+        ? `${n} sample${n === 1 ? "" : "s"} with temperature in this window.`
+        : `${n} of ${total} samples include temperature.`;
+    }
+  }
+
+  const powerSummary = chargeDischargeFromPower(samples);
+  setText("sessionTimeCharge", formatDurationMs(powerSummary.chargeMs));
+  setText("sessionTimeDischarge", formatDurationMs(powerSummary.dischargeMs));
+  setText("sessionAvgChargeW", powerSummary.avgChargeW !== null
+    ? fmt(powerSummary.avgChargeW, " W", 1)
+    : "--");
+  setText("sessionAvgDischargeW", powerSummary.avgDischargeW !== null
+    ? `${fmt(Math.abs(powerSummary.avgDischargeW), " W", 1)} (draw)`
+    : "--");
+}
+
 function updateCharts() {
   const powerPoints = series(state.samples, "power_w");
   drawPowerChart("powerChart", powerPoints);
   if (powerChartExpanded()) {
     drawPowerChart("powerChartExpanded", powerPoints);
   }
-  drawChart("percentChart", series(state.samples, "percent"), { min: 0, max: 100, digits: 0, color: "#bd5b2a" });
-  drawChart("tempChart", series(state.samples, "temperature_c"), { digits: 1, color: "#6f6a28" });
+  drawBatteryChart("percentChart", batterySeries(state.samples));
+  drawTemperatureChart("tempChart", series(state.samples, "temperature_c"));
+  updateSessionSidePanel(state.samples, state.collectorStatus);
 }
 
 async function refresh() {
@@ -501,6 +1032,7 @@ async function refresh() {
       fetchJson(`/api/history?seconds=${state.seconds}`),
     ]);
     state.samples = history.samples || [];
+    state.collectorStatus = current.collector_status ?? null;
     updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples);
     updateCharts();
   } catch (error) {
@@ -518,6 +1050,16 @@ document.querySelectorAll(".range").forEach((button) => {
 });
 
 window.addEventListener("resize", updateCharts);
+
+document.querySelectorAll(".js-legend-help").forEach((button) => {
+  button.addEventListener("click", () => {
+    const id = button.dataset.legendHelp;
+    const dialog = id ? $(id) : null;
+    if (dialog && typeof dialog.showModal === "function") {
+      dialog.showModal();
+    }
+  });
+});
 
 $("powerChartExpandBtn")?.addEventListener("click", openPowerChartFocus);
 $("powerChartFocusClose")?.addEventListener("click", closePowerChartFocus);

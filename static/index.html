@@ -3,14 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Battery Monitor</title>
+    <title>Balanced Battery Monitor</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <h1>Battery Monitor</h1>
-        <p id="subtitle">Waiting for samples</p>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">⚡</div>
+        <div class="brand-copy">
+          <span>Balanced</span>
+          <h1>Battery Monitor</h1>
+          <p id="subtitle">Waiting for samples</p>
+        </div>
       </div>
       <div class="controls" aria-label="History range">
         <button class="range active" data-seconds="3600">1h</button>
@@ -65,28 +69,89 @@
               <h2>Power</h2>
               <span>watts</span>
               <div class="power-legend" aria-label="Power chart legend">
-                <span class="legend-item legend-item-charge">Charging</span>
-                <span class="legend-item legend-item-discharge">Discharging</span>
-                <span class="legend-item legend-item-switch">Mode switch</span>
+                <span class="legend-item legend-item-charge" title="Battery power is positive: energy is flowing into the battery pack (charging from the adapter).">Charging</span>
+                <span class="legend-item legend-item-discharge" title="Battery power is negative: the pack is supplying the system (running from battery).">Discharging</span>
+                <span class="legend-item legend-item-switch" title="A vertical dashed line where power crossed zero between two samples (for example plug/unplug or charge direction change).">Mode switch</span>
               </div>
             </div>
-            <button type="button" class="icon-btn chart-expand" id="powerChartExpandBtn" aria-label="Expand power chart" title="Expand to half screen">⤢</button>
+            <div class="chart-head-actions">
+              <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="powerLegendDialog" aria-label="About the power chart legend" title="Legend help">ⓘ</button>
+              <button type="button" class="icon-btn chart-expand" id="powerChartExpandBtn" aria-label="Expand power chart" title="Expand to half screen">⤢</button>
+            </div>
           </div>
           <canvas id="powerChart" width="1200" height="360"></canvas>
         </article>
         <article class="chart-panel">
           <div class="chart-head">
-            <h2>Battery</h2>
-            <span>percent</span>
+            <div class="chart-head-main">
+              <h2>Battery</h2>
+              <span>percent</span>
+              <div class="battery-legend" aria-label="Battery chart legend">
+                <span class="legend-item legend-item-battery-charge" title="macOS reports the battery is actively accepting charge from the adapter.">Charging</span>
+                <span class="legend-item legend-item-battery-on" title="The Mac is running from the internal battery (not plugged in).">On battery</span>
+                <span class="legend-item legend-item-battery-ac" title="Plugged in, but the pack is not in an active charging state (for example full, Optimized Battery Charging, thermal pause, or idle on AC).">External power</span>
+                <span class="legend-item legend-item-switch" title="A vertical dashed line where charging state changed between two samples (charging, on battery, or external idle).">Mode switch</span>
+              </div>
+            </div>
+            <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="batteryLegendDialog" aria-label="About the battery chart legend" title="Legend help">ⓘ</button>
           </div>
           <canvas id="percentChart" width="1200" height="300"></canvas>
         </article>
-        <article class="chart-panel">
+        <article class="chart-panel chart-temp-panel">
           <div class="chart-head">
-            <h2>Temperature</h2>
-            <span>celsius</span>
+            <div class="chart-head-main">
+              <h2>Temperature</h2>
+              <span>celsius</span>
+              <div class="temp-legend" aria-label="Temperature chart legend">
+                <span class="legend-item legend-item-temp-comfort" title="Below 38 °C (same reference as Charging Diagnosis for warmer cells).">Comfort</span>
+                <span class="legend-item legend-item-temp-warm" title="38 °C and above: warmer cell; macOS may slow charging.">Elevated</span>
+              </div>
+            </div>
+            <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="tempLegendDialog" aria-label="About the temperature chart" title="Chart legend help">ⓘ</button>
           </div>
           <canvas id="tempChart" width="1200" height="300"></canvas>
+        </article>
+        <article class="chart-panel chart-temp-stats-panel chart-session-side-panel" aria-label="Session insights for visible history">
+          <div class="chart-head">
+            <div class="chart-head-main">
+              <h2>Session insights</h2>
+              <span>selected range</span>
+            </div>
+          </div>
+          <div class="session-side-body">
+            <section class="session-block" aria-labelledby="sessionTempHeading">
+              <h3 class="session-block-title" id="sessionTempHeading">Temperature</h3>
+              <div class="temp-stats-grid">
+                <div class="temp-stat">
+                  <span>Latest</span>
+                  <strong id="tempStatLatest">--</strong>
+                </div>
+                <div class="temp-stat">
+                  <span>Min</span>
+                  <strong id="tempStatMin">--</strong>
+                </div>
+                <div class="temp-stat">
+                  <span>Max</span>
+                  <strong id="tempStatMax">--</strong>
+                </div>
+              </div>
+              <p class="temp-stats-note" id="tempStatNote">No samples in this window yet.</p>
+            </section>
+            <section class="session-block" aria-labelledby="sessionPowerHeading">
+              <h3 class="session-block-title" id="sessionPowerHeading">Battery power</h3>
+              <p class="session-block-hint">From stored samples in this window (time-weighted by interval between points).</p>
+              <dl class="session-dl">
+                <dt>Time charging</dt>
+                <dd id="sessionTimeCharge">--</dd>
+                <dt>Time discharging</dt>
+                <dd id="sessionTimeDischarge">--</dd>
+                <dt>Avg W while charging</dt>
+                <dd id="sessionAvgChargeW">--</dd>
+                <dt>Avg W while discharging</dt>
+                <dd id="sessionAvgDischargeW">--</dd>
+              </dl>
+            </section>
+          </div>
         </article>
       </section>
     </main>
@@ -99,16 +164,69 @@
             <h2 id="powerChartFocusTitle">Power</h2>
             <span>watts</span>
             <div class="power-legend" aria-label="Power chart legend">
-              <span class="legend-item legend-item-charge">Charging</span>
-              <span class="legend-item legend-item-discharge">Discharging</span>
-              <span class="legend-item legend-item-switch">Mode switch</span>
+              <span class="legend-item legend-item-charge" title="Battery power is positive: energy is flowing into the battery pack (charging from the adapter).">Charging</span>
+              <span class="legend-item legend-item-discharge" title="Battery power is negative: the pack is supplying the system (running from battery).">Discharging</span>
+              <span class="legend-item legend-item-switch" title="A vertical dashed line where power crossed zero between two samples (for example plug/unplug or charge direction change).">Mode switch</span>
             </div>
           </div>
-          <button type="button" class="icon-btn" id="powerChartFocusClose" aria-label="Close expanded chart" title="Close">✕</button>
+          <div class="chart-head-actions">
+            <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="powerLegendDialog" aria-label="About the power chart legend" title="Legend help">ⓘ</button>
+            <button type="button" class="icon-btn" id="powerChartFocusClose" aria-label="Close expanded chart" title="Close">✕</button>
+          </div>
         </div>
         <canvas id="powerChartExpanded" width="1200" height="360"></canvas>
       </div>
     </div>
+
+    <dialog id="powerLegendDialog" class="legend-help-dialog" aria-labelledby="powerLegendDialogTitle">
+      <h2 id="powerLegendDialogTitle">Power chart legend</h2>
+      <p class="legend-help-intro">Colors and markers follow battery power in watts (positive into the pack, negative out).</p>
+      <dl class="legend-help-list">
+        <dt><span class="legend-item legend-item-charge">Charging</span></dt>
+        <dd>Segments where battery power is above zero: the system is drawing power into the battery from the adapter.</dd>
+        <dt><span class="legend-item legend-item-discharge">Discharging</span></dt>
+        <dd>Segments where battery power is below zero: the battery is feeding the system.</dd>
+        <dt><span class="legend-item legend-item-switch">Mode switch</span></dt>
+        <dd>Dashed vertical lines mark times when power crossed zero between two samples, for example unplugging, plugging in, or switching between charging and supplying the load.</dd>
+      </dl>
+      <form method="dialog">
+        <button type="submit" class="legend-help-close">Close</button>
+      </form>
+    </dialog>
+
+    <dialog id="tempLegendDialog" class="legend-help-dialog" aria-labelledby="tempLegendDialogTitle">
+      <h2 id="tempLegendDialogTitle">Temperature chart</h2>
+      <p class="legend-help-intro">The shaded bands use a 38 °C horizontal guide—the same threshold referenced in Charging Diagnosis when noting an elevated battery temperature.</p>
+      <dl class="legend-help-list">
+        <dt><span class="legend-item legend-item-temp-comfort">Comfort</span></dt>
+        <dd>Readings below 38 °C are shown in the cooler-toned region. This is typical for light workloads and moderate charging.</dd>
+        <dt><span class="legend-item legend-item-temp-warm">Elevated</span></dt>
+        <dd>At or above 38 °C, the chart uses warmer colors. Elevated temperature is one reason macOS may reduce charge power.</dd>
+        <dt>Dashed vertical lines</dt>
+        <dd>When the trace crosses 38 °C between two samples, a vertical marker shows approximately when that crossing happened.</dd>
+      </dl>
+      <form method="dialog">
+        <button type="submit" class="legend-help-close">Close</button>
+      </form>
+    </dialog>
+
+    <dialog id="batteryLegendDialog" class="legend-help-dialog" aria-labelledby="batteryLegendDialogTitle">
+      <h2 id="batteryLegendDialogTitle">Battery chart legend</h2>
+      <p class="legend-help-intro">Colors use macOS charging flags from each stored sample. They describe power source and whether the pack is actively charging.</p>
+      <dl class="legend-help-list">
+        <dt><span class="legend-item legend-item-battery-charge">Charging</span></dt>
+        <dd>The battery is actively accepting charge while on AC or USB power.</dd>
+        <dt><span class="legend-item legend-item-battery-on">On battery</span></dt>
+        <dd>Not on external power: the Mac is running from the internal battery.</dd>
+        <dt><span class="legend-item legend-item-battery-ac">External power</span></dt>
+        <dd>Plugged in, but not in an active charging state. Common when the battery is full or nearly full, when Optimized Battery Charging is holding the level, when charging is paused for temperature, or when the machine runs from the adapter while the pack stays idle.</dd>
+        <dt><span class="legend-item legend-item-switch">Mode switch</span></dt>
+        <dd>Dashed vertical lines when the category changed between consecutive samples (charging, on battery, or external idle).</dd>
+      </dl>
+      <form method="dialog">
+        <button type="submit" class="legend-help-close">Close</button>
+      </form>
+    </dialog>
 
     <script src="/app.js"></script>
   </body>
