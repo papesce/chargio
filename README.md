@@ -1,4 +1,4 @@
-# Battery Monitor
+# Balanced Battery
 
 Local macOS battery and charger monitor with near-real-time charts.
 
