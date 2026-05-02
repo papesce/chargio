@@ -61,8 +61,16 @@
       <section class="charts">
         <article class="chart-panel">
           <div class="chart-head">
-            <h2>Power</h2>
-            <span>watts</span>
+            <div class="chart-head-main">
+              <h2>Power</h2>
+              <span>watts</span>
+              <div class="power-legend" aria-label="Power chart legend">
+                <span class="legend-item legend-item-charge">Charging</span>
+                <span class="legend-item legend-item-discharge">Discharging</span>
+                <span class="legend-item legend-item-switch">Mode switch</span>
+              </div>
+            </div>
+            <button type="button" class="icon-btn chart-expand" id="powerChartExpandBtn" aria-label="Expand power chart" title="Expand to half screen">⤢</button>
           </div>
           <canvas id="powerChart" width="1200" height="360"></canvas>
         </article>
@@ -82,6 +90,25 @@
         </article>
       </section>
     </main>
+
+    <div class="chart-focus" id="powerChartFocus" hidden>
+      <button type="button" class="chart-focus-backdrop" id="powerChartFocusBackdrop" aria-label="Close expanded chart"></button>
+      <div class="chart-focus-panel" role="dialog" aria-modal="true" aria-labelledby="powerChartFocusTitle">
+        <div class="chart-focus-head">
+          <div class="chart-head-main">
+            <h2 id="powerChartFocusTitle">Power</h2>
+            <span>watts</span>
+            <div class="power-legend" aria-label="Power chart legend">
+              <span class="legend-item legend-item-charge">Charging</span>
+              <span class="legend-item legend-item-discharge">Discharging</span>
+              <span class="legend-item legend-item-switch">Mode switch</span>
+            </div>
+          </div>
+          <button type="button" class="icon-btn" id="powerChartFocusClose" aria-label="Close expanded chart" title="Close">✕</button>
+        </div>
+        <canvas id="powerChartExpanded" width="1200" height="360"></canvas>
+      </div>
+    </div>
 
     <script src="/app.js"></script>
   </body>
