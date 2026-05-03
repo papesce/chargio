@@ -213,16 +213,16 @@ component.<span class="code-function">destroy</span>();
                     <th>Visual Outcome</th>
                 </tr>
                 <tr>
-                    <td><code>isPluggedIn: false</code></td>
-                    <td style="color: #facc15;">Yellow flow: Battery → Laptop</td>
+                    <td><code>amperageMa < 0</code></td>
+                    <td style="color: #facc15;">YELLOW flow + Percentage text. Speed/Width scales with load.</td>
+                </tr>
+                <tr>
+                    <td><code>amperageMa > 0</code></td>
+                    <td style="color: #4ade80;">GREEN flow + Percentage text. Speed/Width scales with charge rate.</td>
                 </tr>
                 <tr>
                     <td><code>isPluggedIn: true</code></td>
-                    <td style="color: #58a6ff;">Blue flow: Adapter → Laptop</td>
-                </tr>
-                <tr>
-                    <td><code>isCharging: true</code></td>
-                    <td style="color: #4ade80;">Green flow: Laptop → Battery</td>
+                    <td style="color: #58a6ff;">BLUE flow: Adapter → Laptop. Scales with Intensity slider.</td>
                 </tr>
                 <tr>
                     <td><code>batteryLevel <= 20</code></td>

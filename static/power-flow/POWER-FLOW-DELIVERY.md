@@ -61,13 +61,16 @@ A complete, production-ready power flow animation component for your battery mon
 - [x] SVG + CSS animations (no canvas)
 - [x] Real-time state updates
 - [x] Dynamic battery level visualization
+- [x] Amperage-driven flow dynamics (speed/thickness scale with current)
+- [x] In-battery Voltage readout with themed pill styling
+- [x] Synchronized percentage text color (Yellow/Green/White)
 - [x] Bidirectional power flow (battery ↔ socket)
 - [x] Charging indicator with green animation
-- [x] Color-coded battery levels (Red/Orange/Blue)
+- [x] Color-coded battery levels (Red/Yellow/Green)
 - [x] Animated power arrows showing direction
 - [x] Cable connections (appear/disappear based on state)
 - [x] Responsive design (all screen sizes)
-- [x] Animation speed control (powerFlowIntensity)
+- [x] Independent speed controls for adapter and battery flows
 - [x] Lightweight & performant
 - [x] Framework agnostic (React, Vue, Vanilla JS)
 - [x] Zero external dependencies
@@ -81,7 +84,7 @@ A complete, production-ready power flow animation component for your battery mon
 ### Step 1: View the Interactive Demo
 ```bash
 # Open in your browser
-static/power-flow-demo.html
+power-flow-demo.html
 ```
 
 ### Step 2: Basic Usage
@@ -94,13 +97,13 @@ static/power-flow-demo.html
 <body>
     <div id="power-container"></div>
     
-    <script src="static/power-flow-component.js"></script>
+    <script src="power-flow-component.js"></script>
     <script>
         const component = new PowerFlowComponent('power-container', {
             isPluggedIn: false,
             batteryLevel: 75,
-            isCharging: false,
-            powerFlowIntensity: 1.0
+            amperageMa: -1200,
+            voltageMv: 12240
         });
         
         // Update anytime
@@ -123,8 +126,10 @@ See `INTEGRATION_GUIDE.py` for Flask integration or `POWER-FLOW-README.md` for o
 {
   isPluggedIn: boolean,           // Connected to wall power?
   batteryLevel: number (0-100),   // Current battery %
-  isCharging: boolean,            // Battery actively charging?
-  powerFlowIntensity: number      // Animation speed (0.2-2.0)
+  isCharging: boolean,            // Battery actively receiving charge?
+  amperageMa: number,             // Current in mA (+ for in, - for out)
+  voltageMv: number,              // Battery voltage in millivolts
+  powerFlowIntensity: number      // Base animation speed (0.2-2.0)
 }
 ```
 
@@ -132,12 +137,14 @@ See `INTEGRATION_GUIDE.py` for Flask integration or `POWER-FLOW-README.md` for o
 
 | State | What You See |
 |-------|-------------|
-| `isPluggedIn: false` | Battery icon visible, blue arrow Battery→Laptop, no socket |
-| `isPluggedIn: true, isCharging: false` | Socket cable visible, blue arrow Socket→Laptop |
-| `isPluggedIn: true, isCharging: true` | Socket cable + charging cable, blue Socket→Laptop + green Laptop→Battery, screen glows green |
+| `amperageMa < 0` | YELLOW flow Battery→Laptop. Speed/Width scales with load magnitude. |
+| `amperageMa > 0` | GREEN flow Laptop→Battery. Speed/Width scales with charge rate. |
+| `isPluggedIn: true` | Socket cable visible, BLUE flow Socket→Laptop. |
 | `batteryLevel: 0-20` | Battery fill is RED (critical) |
-| `batteryLevel: 21-50` | Battery fill is ORANGE (medium) |
-| `batteryLevel: 51-100` | Battery fill is BLUE (healthy) |
+| `batteryLevel: 21-55` | Battery fill is YELLOW (medium/warning) |
+| `batteryLevel: 56-100` | Battery fill is GREEN (healthy) |
+| **Percentage Color** | Text syncs with flow: Yellow (Discharge), Green (Charge), White (Idle) |
+| **Voltage** | Technical readout in top-right "pill" of battery representation |
 
 ---
 

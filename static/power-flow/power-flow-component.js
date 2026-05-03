@@ -20,10 +20,12 @@ class PowerFlowComponent {
       powerW: null,
       systemPowerW: null,
       adapterWatts: null,
+      detectedAdapterWatts: null,
       adapterVoltageMv: null,
       adapterCurrentMa: null,
       currentCapacityMah: null,
       maxCapacityMah: null,
+      designCapacityMah: null,
       temperatureC: null,
       cycleCount: null,
       timeRemainingMin: null,
@@ -190,27 +192,8 @@ class PowerFlowComponent {
     group.appendChild(this.createParticle('battery-particle-b', this.getConnectionPath('batteryToLaptop'), '#facc15', '-0.8s'));
     group.appendChild(this.createParticle('charge-particle-a', this.getConnectionPath('laptopToBattery'), '#4ade80', '0s'));
     group.appendChild(this.createParticle('charge-particle-b', this.getConnectionPath('laptopToBattery'), '#4ade80', '-0.9s'));
-    group.appendChild(this.createLineCurrentLabel());
 
     svg.appendChild(group);
-  }
-
-  createLineCurrentLabel() {
-    const group = this.el('g', { id: 'battery-line-current-group' });
-    group.appendChild(this.el('rect', {
-      id: 'battery-line-current-bg',
-      x: '500',
-      y: '314',
-      width: '120',
-      height: '26',
-      rx: '13',
-      class: 'line-current-bg'
-    }));
-    group.appendChild(this.text(this.getBatteryLineCurrentLabel(), 560, 331, 'line-current-label', {
-      id: 'battery-line-current-label',
-      anchor: 'middle'
-    }));
-    return group;
   }
 
   createParticle(id, pathD, color, begin) {
@@ -227,10 +210,19 @@ class PowerFlowComponent {
 
   createCharger(svg) {
     const group = this.el('g', { id: 'charger-group', filter: 'url(#cardShadow)' });
-    group.appendChild(this.el('rect', { x: '62', y: '178', width: '118', height: '132', rx: '26', class: 'glass-card' }));
+    group.appendChild(this.el('rect', { id: 'charger-card', x: '62', y: '178', width: '118', height: '132', rx: '26', class: 'glass-card' }));
     group.appendChild(this.el('path', { d: 'M 112 212 L 94 250 H 116 L 102 282 L 142 236 H 119 Z', fill: 'rgba(88, 166, 255, 0.2)', stroke: '#58a6ff', 'stroke-width': '3', 'stroke-linejoin': 'round' }));
     group.appendChild(this.el('line', { x1: '89', y1: '198', x2: '89', y2: '222', class: 'muted-stroke' }));
     group.appendChild(this.el('line', { x1: '153', y1: '198', x2: '153', y2: '222', class: 'muted-stroke' }));
+    
+    group.appendChild(this.el('rect', { 
+      id: 'charger-wattage-bg', 
+      x: '86', y: '276', width: '70', height: '22', rx: '11', 
+      fill: 'rgba(88, 166, 255, 0.08)', 
+      stroke: 'rgba(88, 166, 255, 0.25)' 
+    }));
+    group.appendChild(this.text(this.formatNumber(this.state.adapterWatts, ' W', 0), 121, 292, 'label-kicker', { anchor: 'middle', id: 'charger-wattage-label' }));
+
     group.appendChild(this.text('Charger', 121, 342, 'label-body', { anchor: 'middle' }));
     group.appendChild(this.text(this.getChargerHeadline(), 121, 363, 'label-muted', { anchor: 'middle', id: 'charger-summary-label' }));
     svg.appendChild(group);
@@ -251,13 +243,22 @@ class PowerFlowComponent {
 
   createBatteryHero(svg) {
     const group = this.el('g', { id: 'battery-hero-group', filter: 'url(#cardShadow)' });
-    group.appendChild(this.el('rect', { x: '610', y: '88', width: '220', height: '290', rx: '34', class: 'glass-card' }));
+    group.appendChild(this.el('rect', { id: 'battery-card', x: '610', y: '88', width: '220', height: '290', rx: '34', class: 'glass-card' }));
+    
+    group.appendChild(this.el('rect', { 
+      id: 'battery-voltage-bg', 
+      x: '725', y: '108', width: '80', height: '22', rx: '11', 
+      fill: 'rgba(255, 255, 255, 0.05)', 
+      stroke: 'rgba(255, 255, 255, 0.14)' 
+    }));
+    group.appendChild(this.text(this.formatVoltage(this.state.voltageMv), 765, 124, 'label-kicker', { anchor: 'middle', id: 'battery-voltage-label' }));
+    
     group.appendChild(this.el('circle', { cx: '720', cy: '230', r: '82', class: 'battery-ring-track' }));
     group.appendChild(this.el('circle', { id: 'battery-ring-fill', cx: '720', cy: '230', r: '82', class: 'battery-ring-fill', stroke: '#4ade80' }));
     group.appendChild(this.text(`${this.state.batteryLevel}%`, 720, 220, 'battery-percent', { anchor: 'middle', id: 'battery-text' }));
     group.appendChild(this.text(this.getBatteryStateLabel(), 720, 248, 'label-body', { anchor: 'middle', id: 'battery-state-label' }));
     group.appendChild(this.text(this.getBatterySubLabel(), 720, 280, 'label-muted', { anchor: 'middle', id: 'battery-sub-label' }));
-    group.appendChild(this.el('rect', { x: '678', y: '331', width: '84', height: '22', rx: '11', id: 'battery-pill-bg', fill: 'rgba(77, 222, 128, 0.12)', stroke: 'rgba(77, 222, 128, 0.35)' }));
+    group.appendChild(this.el('rect', { x: '678', y: '331', width: '84', height: '22', rx: '11', id: 'battery-pill-bg', fill: 'rgba(148, 163, 184, 0.1)', stroke: 'rgba(148, 163, 184, 0.3)' }));
     group.appendChild(this.text(this.getBatteryTempLabel(), 720, 346, 'label-muted', { anchor: 'middle', id: 'battery-temp-pill' }));
     svg.appendChild(group);
   }
@@ -280,12 +281,17 @@ class PowerFlowComponent {
   }
 
   metricCard(x, y, width, label, value, detail, accent, idPrefix) {
-    const group = this.el('g', { filter: 'url(#cardShadow)' });
+    const group = this.el('g', { filter: 'url(#cardShadow)', id: idPrefix });
     group.appendChild(this.el('rect', { x, y, width, height: '82', rx: '18', class: 'glass-card' }));
     group.appendChild(this.el('rect', { x: x + 14, y: y + 15, width: '4', height: '52', rx: '2', fill: accent, id: `${idPrefix}-accent` }));
     group.appendChild(this.text(label, x + 28, y + 29, 'metric-label'));
     group.appendChild(this.text(value, x + 28, y + 53, 'metric-value', { id: `${idPrefix}-value` }));
     group.appendChild(this.text(detail, x + 28, y + 72, 'label-muted', { id: `${idPrefix}-detail` }));
+    
+    // Tooltip support
+    const title = this.el('title', { id: `${idPrefix}-tooltip` });
+    group.appendChild(title);
+    
     return group;
   }
 
@@ -302,14 +308,29 @@ class PowerFlowComponent {
   updateVisualsBasedOnState() {
     const level = this.clamp(Number(this.state.batteryLevel) || 0, 0, 100);
     const ring = this.container.querySelector('#battery-ring-fill');
+    const batteryColor = this.getBatteryColor();
     if (ring) {
       const circumference = 2 * Math.PI * 82;
       ring.setAttribute('stroke-dasharray', `${circumference}`);
       ring.setAttribute('stroke-dashoffset', `${circumference * (1 - level / 100)}`);
-      ring.setAttribute('stroke', this.getBatteryColor());
+      ring.setAttribute('stroke', batteryColor);
     }
 
+    // Sync yellow flow gradient and particles with battery ring color
+    const yellowFlow = this.container.querySelector('#yellowFlow');
+    if (yellowFlow) {
+      const stops = yellowFlow.querySelectorAll('stop');
+      if (stops.length >= 3) {
+        stops[0].setAttribute('stop-color', this.getBatteryColor(0));
+        stops[1].setAttribute('stop-color', batteryColor);
+        stops[2].setAttribute('stop-color', this.getBatteryColor(0));
+      }
+    }
+    this.setAttr('#battery-particle-a', 'fill', batteryColor);
+    this.setAttr('#battery-particle-b', 'fill', batteryColor);
+
     this.setText('battery-text', `${Math.round(level)}%`);
+    this.setText('battery-voltage-label', this.formatVoltage(this.state.voltageMv));
     this.setText('battery-state-label', this.getBatteryStateLabel());
     this.setText('battery-sub-label', this.getBatterySubLabel());
     this.setText('battery-temp-pill', this.getBatteryTempLabel());
@@ -317,6 +338,9 @@ class PowerFlowComponent {
     this.setText('secondary-message-label', this.getSecondaryMessage());
     this.setText('source-insight-label', this.getSourceInsight());
     this.setText('charger-summary-label', this.getChargerHeadline());
+    
+    const displayWatts = this.state.systemPowerW ?? this.state.detectedAdapterWatts ?? this.state.adapterWatts;
+    this.setText('charger-wattage-label', this.formatNumber(displayWatts, ' W', 0));
 
     this.setText('source-card-value', this.getSourceCardValue());
     this.setText('source-card-detail', this.getSourceCardDetail());
@@ -324,30 +348,98 @@ class PowerFlowComponent {
     this.setText('battery-flow-card-detail', this.getBatteryFlowDetail());
     this.setText('battery-health-card-value', this.getBatteryHealthValue());
     this.setText('battery-health-card-detail', this.getBatteryHealthDetail());
+    this.setText('battery-health-card-tooltip', this.getBatteryHealthTooltip());
     this.setText('session-card-value', this.getSessionValue());
     this.setText('session-card-detail', this.getSessionDetail());
-    this.setText('battery-line-current-label', this.getBatteryLineCurrentLabel());
 
-    this.setAttr('#battery-pill-bg', 'fill', this.getBatteryColor(0.12));
-    this.setAttr('#battery-pill-bg', 'stroke', this.getBatteryColor(0.35));
+    const amps = Number(this.state.amperageMa) || 0;
+    const isDischarging = amps < 0;
+    const isCharging = amps > 0;
+    const isPluggedIn = !!this.state.isPluggedIn;
+
+    // Sync battery percentage color with flow state
+    let percentColor = '#f8fafc'; // Default white
+    if (isDischarging) percentColor = batteryColor;
+    else if (isCharging) percentColor = '#4ade80'; // Green
+    this.setAttr('#battery-text', 'fill', percentColor);
+
+    // Temperature pill - fixed slate/blue theme
+    this.setAttr('#battery-pill-bg', 'fill', 'rgba(148, 163, 184, 0.1)');
+    this.setAttr('#battery-pill-bg', 'stroke', 'rgba(148, 163, 184, 0.3)');
+    
+    this.setAttr('#battery-voltage-bg', 'fill', this.getBatteryColor(0.08));
+    this.setAttr('#battery-voltage-bg', 'stroke', this.getBatteryColor(0.25));
+    
+    this.setAttr('#charger-wattage-bg', 'opacity', isPluggedIn ? '1' : '0');
+    this.setAttr('#charger-wattage-label', 'opacity', isPluggedIn ? '1' : '0');
+
+    // Highlight charger border when connected
+    const chargerCard = this.container.querySelector('#charger-card');
+    if (chargerCard) {
+      chargerCard.style.stroke = isPluggedIn ? 'rgba(88, 166, 255, 0.8)' : 'rgba(255, 255, 255, 0.14)';
+      chargerCard.style.strokeWidth = isPluggedIn ? '2px' : '1px';
+      chargerCard.setAttribute('filter', isPluggedIn ? 'url(#softGlow)' : '');
+    }
+
+    // Highlight battery border when running on battery (unplugged)
+    const batteryCard = this.container.querySelector('#battery-card');
+    if (batteryCard) {
+      const isRunningOnBattery = !isPluggedIn;
+      batteryCard.style.stroke = isRunningOnBattery ? this.getBatteryColor(0.8) : 'rgba(255, 255, 255, 0.14)';
+      batteryCard.style.strokeWidth = isRunningOnBattery ? '2px' : '1px';
+      batteryCard.setAttribute('filter', isRunningOnBattery ? 'url(#softGlow)' : '');
+    }
+
+    const chargerBase = this.container.querySelector('#charger-to-laptop-base');
+    if (chargerBase) {
+      chargerBase.style.stroke = isPluggedIn ? 'rgba(88, 166, 255, 0.25)' : 'rgba(148, 163, 184, 0.18)';
+    }
+
     this.setAttr('#battery-flow-card-accent', 'fill', this.getBatteryFlowColor());
-    this.setAttr('#battery-line-current-bg', 'stroke', this.getBatteryFlowColor());
-    this.setAttr('#laptop-status-dot', 'fill', this.state.isPluggedIn ? 'rgba(88, 166, 255, 0.18)' : 'rgba(250, 204, 21, 0.18)');
+    this.setAttr('#laptop-status-dot', 'fill', isPluggedIn ? 'rgba(88, 166, 255, 0.18)' : 'rgba(250, 204, 21, 0.18)');
 
-    this.toggleFlow('charger-to-laptop', this.state.isPluggedIn, 'active-flow');
-    this.toggleFlow('battery-to-laptop', !this.state.isPluggedIn, 'reverse-flow');
-    this.toggleFlow('laptop-to-battery', this.state.isPluggedIn && this.state.isCharging, 'active-flow');
+    const adapterAmps = this.getChargerToLaptopCurrentMa();
+    const hasAdapterFlow = isPluggedIn && adapterAmps > 0;
 
-    this.toggleParticles(['charger-particle-a', 'charger-particle-b'], this.state.isPluggedIn);
-    this.toggleParticles(['battery-particle-a', 'battery-particle-b'], !this.state.isPluggedIn);
-    this.toggleParticles(['charge-particle-a', 'charge-particle-b'], this.state.isPluggedIn && this.state.isCharging);
+    this.toggleFlow('charger-to-laptop', isPluggedIn, hasAdapterFlow ? 'active-flow' : '');
+    this.toggleFlow('battery-to-laptop', isDischarging, 'active-flow');
+    this.toggleFlow('laptop-to-battery', isCharging, 'active-flow');
 
-    const duration = `${Math.max(0.75, 2.2 / Math.max(0.2, Number(this.state.powerFlowIntensity) || 1))}s`;
-    this.container.querySelectorAll('.flow-path').forEach((path) => {
-      path.style.animationDuration = duration;
-    });
-    this.container.querySelectorAll('animateMotion').forEach((motion) => {
-      motion.setAttribute('dur', duration);
+    this.toggleParticles(['charger-particle-a', 'charger-particle-b'], hasAdapterFlow);
+    this.toggleParticles(['battery-particle-a', 'battery-particle-b'], isDischarging);
+    this.toggleParticles(['charge-particle-a', 'charge-particle-b'], isCharging);
+
+    const baseIntensity = Math.max(0.2, Number(this.state.powerFlowIntensity) || 1);
+    const chargerIntensity = Math.max(0.1, (Math.abs(adapterAmps) / 6000) * 2.2 + 0.1);
+    const batteryIntensity = Math.max(0.1, (Math.abs(amps) / 6000) * 2.2 + 0.1);
+
+    this.updatePathDynamics('charger-to-laptop', chargerIntensity);
+    this.updatePathDynamics('battery-to-laptop', batteryIntensity);
+    this.updatePathDynamics('laptop-to-battery', batteryIntensity);
+
+    this.updateParticleDynamics(['charger-particle-a', 'charger-particle-b'], chargerIntensity);
+    this.updateParticleDynamics(['battery-particle-a', 'battery-particle-b'], batteryIntensity);
+    this.updateParticleDynamics(['charge-particle-a', 'charge-particle-b'], batteryIntensity);
+  }
+
+  updatePathDynamics(id, intensity) {
+    const path = this.container.querySelector(`#${id}-flow`);
+    if (!path) return;
+    const duration = `${Math.max(0.5, 2.2 / intensity)}s`;
+    const strokeWidth = 1.5 + (intensity * 3.5);
+    path.style.animationDuration = duration;
+    path.setAttribute('stroke-width', strokeWidth);
+  }
+
+  updateParticleDynamics(ids, intensity) {
+    const duration = `${Math.max(0.5, 2.2 / intensity)}s`;
+    const radius = 2 + (intensity * 3);
+    ids.forEach(id => {
+      const particle = this.container.querySelector(`#${id}`);
+      if (!particle) return;
+      particle.setAttribute('r', radius);
+      const motion = particle.querySelector('animateMotion');
+      if (motion) motion.setAttribute('dur', duration);
     });
   }
 
@@ -389,11 +481,26 @@ class PowerFlowComponent {
   }
 
   getSecondaryMessage() {
-    if (!this.state.isPluggedIn) {
-      return `${this.getBatteryFlowValue()} from the pack at ${this.formatVoltage(this.state.voltageMv)}.`;
+    const time = this.formatMinutes(this.state.timeRemainingMin);
+    const isPluggedIn = !!this.state.isPluggedIn;
+    const isCharging = !!this.state.isCharging;
+    const level = Number(this.state.batteryLevel) || 0;
+
+    if (isPluggedIn && !isCharging) {
+      if (level >= 98) return 'Battery is fully charged and maintained.';
+      return 'Power is supplied by the adapter; battery is idle.';
     }
-    const input = this.state.systemPowerW ?? this.state.adapterWatts;
-    return `External power is supplying ${this.formatNumber(input, ' W', 1)} at ${this.formatVoltage(this.state.adapterVoltageMv)}.`;
+
+    if (time === '--') {
+      return 'Calculating estimated time...';
+    }
+    
+    if (isCharging) {
+      return `Estimated ${time} until fully charged.`;
+    } else if (!isPluggedIn) {
+      return `Estimated ${time} of battery life remaining.`;
+    }
+    return 'Battery is maintained at current level.';
   }
 
   getSourceInsight() {
@@ -414,22 +521,23 @@ class PowerFlowComponent {
   }
 
   getBatteryTempLabel() {
-    return `${this.formatNumber(this.state.temperatureC, ' C', 1)} cell`;
+    return `${this.formatNumber(this.state.temperatureC, ' C', 1)}`;
   }
 
   getChargerHeadline() {
     if (!this.state.isPluggedIn) return 'Disconnected';
-    return `${this.formatNumber(this.state.adapterWatts, ' W', 0)} adapter`;
+    const watts = this.state.detectedAdapterWatts ?? this.state.adapterWatts;
+    return `${this.formatNumber(watts, ' W', 0)} adapter`;
   }
 
   getSourceCardValue() {
     if (!this.state.isPluggedIn) return 'Battery';
-    return this.formatNumber(this.state.systemPowerW ?? this.state.adapterWatts, ' W', 1);
+    return this.formatInteger(this.getChargerToLaptopCurrentMa(), ' mA');
   }
 
   getSourceCardDetail() {
     if (!this.state.isPluggedIn) return 'No external power';
-    return `${this.formatVoltage(this.state.adapterVoltageMv)} / ${this.formatInteger(this.getChargerToLaptopCurrentMa(), ' mA')}`;
+    return `${this.formatVoltage(this.state.adapterVoltageMv)}`;
   }
 
   getBatteryFlowValue() {
@@ -440,24 +548,29 @@ class PowerFlowComponent {
     return 'Idle';
   }
 
-  getBatteryLineCurrentLabel() {
-    const current = this.state.amperageMa;
-    if (current === null || current === undefined || Number.isNaN(Number(current))) return '-- mA';
-    if (Number(current) < 0) return `${this.formatInteger(Math.abs(Number(current)))} mA out`;
-    if (Number(current) > 0) return `${this.formatInteger(Number(current))} mA in`;
-    return '0 mA';
-  }
-
   getBatteryFlowDetail() {
-    return `${this.formatNumber(this.state.powerW, ' W', 1)} at ${this.formatVoltage(this.state.voltageMv)}`;
+    return `${this.formatNumber(this.state.powerW, ' W', 1)}`;
   }
 
   getBatteryHealthValue() {
-    return this.formatNumber(this.state.temperatureC, ' C', 1);
+    const max = Number(this.state.maxCapacityMah);
+    const design = Number(this.state.designCapacityMah);
+    if (!max || !design || Number.isNaN(max) || Number.isNaN(design)) return '--';
+    const health = (max / design) * 100;
+    return `${health.toFixed(1)}% Health`;
   }
 
   getBatteryHealthDetail() {
-    return `${this.formatInteger(this.state.cycleCount)} cycles / ${this.formatVoltage(this.state.voltageMv)}`;
+    const cycles = this.state.cycleCount;
+    if (cycles === null || cycles === undefined) return '-- cycles';
+    return `${this.formatInteger(cycles)} / 1000 cycles`;
+  }
+
+  getBatteryHealthTooltip() {
+    const max = Number(this.state.maxCapacityMah);
+    const design = Number(this.state.designCapacityMah);
+    if (!max || !design || Number.isNaN(max) || Number.isNaN(design)) return '';
+    return `Full Charge Capacity: ${this.formatInteger(max)} mAh / Design Capacity: ${this.formatInteger(design)} mAh`;
   }
 
   getSessionValue() {
@@ -471,7 +584,7 @@ class PowerFlowComponent {
   getBatteryFlowColor() {
     const current = Number(this.state.amperageMa);
     if (Number.isNaN(current) || current === 0) return '#94a3b8';
-    return current > 0 ? '#4ade80' : '#facc15';
+    return current > 0 ? '#4ade80' : this.getBatteryColor();
   }
 
   getBatteryColor(alpha) {
@@ -484,15 +597,20 @@ class PowerFlowComponent {
   }
 
   getChargerToLaptopCurrentMa() {
-    if (
-      this.state.systemPowerW !== null &&
-      this.state.systemPowerW !== undefined &&
-      this.state.adapterVoltageMv
-    ) {
-      return Math.round((Number(this.state.systemPowerW) / (Number(this.state.adapterVoltageMv) / 1000)) * 1000);
+    const watts = this.state.systemPowerW ?? this.state.adapterWatts;
+    const volts = this.state.adapterVoltageMv;
+    
+    // If we have variable watts and volts, calculate actual current
+    if (watts !== null && watts !== undefined && volts) {
+      return Math.round((Number(watts) / (Number(volts) / 1000)) * 1000);
     }
 
-    return this.state.adapterCurrentMa;
+    // Fallback to adapterCurrentMa if available
+    if (this.state.adapterCurrentMa !== null && this.state.adapterCurrentMa !== undefined) {
+      return Number(this.state.adapterCurrentMa);
+    }
+
+    return 0;
   }
 
   formatInteger(value, suffix = '') {
