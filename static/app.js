@@ -57,63 +57,6 @@ function formatDeltaPercent(delta) {
   return `${sign}${n.toFixed(1)}%`;
 }
 
-function chargeDischargeFromPower(samples, eps = 0.05) {
-  const empty = {
-    chargeMs: 0,
-    dischargeMs: 0,
-    idleMs: 0,
-    deltaPercent: null,
-    avgChargeW: null,
-    avgDischargeW: null,
-  };
-  if (!samples || samples.length < 2) return empty;
-
-  let chargeMs = 0;
-  let dischargeMs = 0;
-  let idleMs = 0;
-  let sumChargeW = 0;
-  let sumDisW = 0;
-
-  for (let i = 0; i < samples.length - 1; i += 1) {
-    const a = samples[i];
-    const b = samples[i + 1];
-    const dt = new Date(b.sampled_at).getTime() - new Date(a.sampled_at).getTime();
-    if (!Number.isFinite(dt) || dt <= 0) continue;
-    const pa = a.power_w;
-    const pb = b.power_w;
-    if (pa === null || pa === undefined || pb === null || pb === undefined) {
-      idleMs += dt;
-      continue;
-    }
-    const mid = (Number(pa) + Number(pb)) / 2;
-    if (mid > eps) {
-      chargeMs += dt;
-      sumChargeW += mid * dt;
-    } else if (mid < -eps) {
-      dischargeMs += dt;
-      sumDisW += mid * dt;
-    } else {
-      idleMs += dt;
-    }
-  }
-
-  const pFirst = samples[0].percent;
-  const pLast = samples[samples.length - 1].percent;
-  const deltaPercent = (pFirst !== null && pFirst !== undefined && pLast !== null && pLast !== undefined
-    && !Number.isNaN(Number(pFirst)) && !Number.isNaN(Number(pLast)))
-    ? Number(pLast) - Number(pFirst)
-    : null;
-
-  return {
-    chargeMs,
-    dischargeMs,
-    idleMs,
-    deltaPercent,
-    avgChargeW: chargeMs > 0 ? sumChargeW / chargeMs : null,
-    avgDischargeW: dischargeMs > 0 ? sumDisW / dischargeMs : null,
-  };
-}
-
 function maxSampleGapMs(samples) {
   if (!samples || samples.length < 2) return null;
   let maxGap = 0;
@@ -946,74 +889,6 @@ function closePowerChartFocus() {
   updateCharts();
 }
 
-function updateSessionSidePanel(samples, collectorStatus) {
-  const setText = (id, text) => {
-    const el = $(id);
-    if (el) el.textContent = text;
-  };
-
-  const latestEl = $("tempStatLatest");
-  const minEl = $("tempStatMin");
-  const maxEl = $("tempStatMax");
-  const noteEl = $("tempStatNote");
-  if (!latestEl || !minEl || !maxEl) return;
-
-  if (!samples || !samples.length) {
-    setText("tempStatLatest", "--");
-    setText("tempStatMin", "--");
-    setText("tempStatMax", "--");
-    if (noteEl) noteEl.textContent = "No samples in this window yet.";
-    setText("sessionTimeCharge", "--");
-    setText("sessionTimeDischarge", "--");
-    setText("sessionAvgChargeW", "--");
-    setText("sessionAvgDischargeW", "--");
-    return;
-  }
-
-  const temps = samples
-    .map((s) => s.temperature_c)
-    .filter((v) => v !== null && v !== undefined && !Number.isNaN(Number(v)))
-    .map(Number);
-
-  const last = samples[samples.length - 1];
-  const latestVal = last.temperature_c;
-  setText("tempStatLatest", (latestVal !== null && latestVal !== undefined && !Number.isNaN(Number(latestVal)))
-    ? fmt(Number(latestVal), " °C", 1)
-    : "--");
-
-  if (!temps.length) {
-    setText("tempStatMin", "--");
-    setText("tempStatMax", "--");
-  } else {
-    setText("tempStatMin", fmt(Math.min(...temps), " °C", 1));
-    setText("tempStatMax", fmt(Math.max(...temps), " °C", 1));
-  }
-
-  if (noteEl) {
-    const n = temps.length;
-    const total = samples.length;
-    if (n === 0) {
-      noteEl.textContent = total
-        ? `No temperature readings in ${total} sample${total === 1 ? "" : "s"} for this range.`
-        : "No samples in this window yet.";
-    } else {
-      noteEl.textContent = n === total
-        ? `${n} sample${n === 1 ? "" : "s"} with temperature in this window.`
-        : `${n} of ${total} samples include temperature.`;
-    }
-  }
-
-  const powerSummary = chargeDischargeFromPower(samples);
-  setText("sessionTimeCharge", formatDurationMs(powerSummary.chargeMs));
-  setText("sessionTimeDischarge", formatDurationMs(powerSummary.dischargeMs));
-  setText("sessionAvgChargeW", powerSummary.avgChargeW !== null
-    ? fmt(powerSummary.avgChargeW, " W", 1)
-    : "--");
-  setText("sessionAvgDischargeW", powerSummary.avgDischargeW !== null
-    ? `${fmt(Math.abs(powerSummary.avgDischargeW), " W", 1)} (draw)`
-    : "--");
-}
-
 function updateCharts() {
   const powerPoints = series(state.samples, "power_w");
   drawPowerChart("powerChart", powerPoints);
@@ -1022,7 +897,6 @@ function updateCharts() {
   }
   drawBatteryChart("percentChart", batterySeries(state.samples));
   drawTemperatureChart("tempChart", series(state.samples, "temperature_c"));
-  updateSessionSidePanel(state.samples, state.collectorStatus);
 }
 
 async function refresh() {

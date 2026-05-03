@@ -63,7 +63,16 @@
       </section>
 
       <section class="charts">
-        <article class="chart-panel">
+        <article class="chart-panel chart-power-flow-panel" aria-label="Power flow visualization">
+          <div class="chart-head">
+            <div class="chart-head-main">
+              <h2>Battery Flow</h2>
+              <span>live power path</span>
+            </div>
+          </div>
+          <div id="power-flow-container"></div>
+        </article>
+        <article class="chart-panel chart-power-panel">
           <div class="chart-head">
             <div class="chart-head-main">
               <h2>Power</h2>
@@ -81,22 +90,6 @@
           </div>
           <canvas id="powerChart" width="1200" height="360"></canvas>
         </article>
-        <article class="chart-panel">
-          <div class="chart-head">
-            <div class="chart-head-main">
-              <h2>Battery</h2>
-              <span>percent</span>
-              <div class="battery-legend" aria-label="Battery chart legend">
-                <span class="legend-item legend-item-battery-charge" title="macOS reports the battery is actively accepting charge from the adapter.">Charging</span>
-                <span class="legend-item legend-item-battery-on" title="The Mac is running from the internal battery (not plugged in).">On battery</span>
-                <span class="legend-item legend-item-battery-ac" title="Plugged in, but the pack is not in an active charging state (for example full, Optimized Battery Charging, thermal pause, or idle on AC).">External power</span>
-                <span class="legend-item legend-item-switch" title="A vertical dashed line where charging state changed between two samples (charging, on battery, or external idle).">Mode switch</span>
-              </div>
-            </div>
-            <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="batteryLegendDialog" aria-label="About the battery chart legend" title="Legend help">ⓘ</button>
-          </div>
-          <canvas id="percentChart" width="1200" height="300"></canvas>
-        </article>
         <article class="chart-panel chart-temp-panel">
           <div class="chart-head">
             <div class="chart-head-main">
@@ -111,47 +104,21 @@
           </div>
           <canvas id="tempChart" width="1200" height="300"></canvas>
         </article>
-        <article class="chart-panel chart-temp-stats-panel chart-session-side-panel" aria-label="Session insights for visible history">
+        <article class="chart-panel chart-battery-panel">
           <div class="chart-head">
             <div class="chart-head-main">
-              <h2>Session insights</h2>
-              <span>selected range</span>
-            </div>
-          </div>
-          <div class="session-side-body">
-            <section class="session-block" aria-labelledby="sessionTempHeading">
-              <h3 class="session-block-title" id="sessionTempHeading">Temperature</h3>
-              <div class="temp-stats-grid">
-                <div class="temp-stat">
-                  <span>Latest</span>
-                  <strong id="tempStatLatest">--</strong>
-                </div>
-                <div class="temp-stat">
-                  <span>Min</span>
-                  <strong id="tempStatMin">--</strong>
-                </div>
-                <div class="temp-stat">
-                  <span>Max</span>
-                  <strong id="tempStatMax">--</strong>
-                </div>
+              <h2>Battery</h2>
+              <span>percent</span>
+              <div class="battery-legend" aria-label="Battery chart legend">
+                <span class="legend-item legend-item-battery-charge" title="macOS reports the battery is actively accepting charge from the adapter.">Charging</span>
+                <span class="legend-item legend-item-battery-on" title="The Mac is running from the internal battery (not plugged in).">On battery</span>
+                <span class="legend-item legend-item-battery-ac" title="Plugged in, but the pack is not in an active charging state (for example full, Optimized Battery Charging, thermal pause, or idle on AC).">External power</span>
+                <span class="legend-item legend-item-switch" title="A vertical dashed line where charging state changed between two samples (charging, on battery, or external idle).">Mode switch</span>
               </div>
-              <p class="temp-stats-note" id="tempStatNote">No samples in this window yet.</p>
-            </section>
-            <section class="session-block" aria-labelledby="sessionPowerHeading">
-              <h3 class="session-block-title" id="sessionPowerHeading">Battery power</h3>
-              <p class="session-block-hint">From stored samples in this window (time-weighted by interval between points).</p>
-              <dl class="session-dl">
-                <dt>Time charging</dt>
-                <dd id="sessionTimeCharge">--</dd>
-                <dt>Time discharging</dt>
-                <dd id="sessionTimeDischarge">--</dd>
-                <dt>Avg W while charging</dt>
-                <dd id="sessionAvgChargeW">--</dd>
-                <dt>Avg W while discharging</dt>
-                <dd id="sessionAvgDischargeW">--</dd>
-              </dl>
-            </section>
+            </div>
+            <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="batteryLegendDialog" aria-label="About the battery chart legend" title="Legend help">ⓘ</button>
           </div>
+          <canvas id="percentChart" width="1200" height="300"></canvas>
         </article>
       </section>
     </main>
@@ -228,6 +195,68 @@
       </form>
     </dialog>
 
+    <script src="/power-flow/power-flow-component.js"></script>
     <script src="/app.js"></script>
+    <script>
+      // Initialize Power Flow Component with real battery data
+      let powerFlowComponent = null;
+
+      function initPowerFlow() {
+        if (!powerFlowComponent) {
+          powerFlowComponent = new PowerFlowComponent('power-flow-container', {
+            isPluggedIn: false,
+            batteryLevel: 50,
+            isCharging: false,
+            powerFlowIntensity: 1.0
+          });
+        }
+      }
+
+      // Update power flow component every second with real data
+      function updatePowerFlow() {
+        fetch('/api/current')
+          .then(response => response.json())
+          .then(data => {
+            if (data.sample && powerFlowComponent) {
+              const sample = data.sample;
+              
+              // Calculate power flow intensity based on power draw
+              let intensity = 1.0;
+              if (sample.power_w && Math.abs(sample.power_w) > 50) {
+                intensity = Math.min(Math.abs(sample.power_w) / 50, 2.0);
+              }
+
+              // Update component state with real battery data
+              powerFlowComponent.setState({
+                isPluggedIn: sample.external_connected === 1 || sample.external_connected === true,
+                batteryLevel: Math.round(sample.percent ?? 50),
+                isCharging: sample.is_charging === 1 || sample.is_charging === true,
+                powerFlowIntensity: intensity,
+                voltageMv: sample.voltage_mv,
+                amperageMa: sample.amperage_ma,
+                powerW: sample.power_w,
+                systemPowerW: sample.system_power_w,
+                adapterWatts: sample.adapter_watts,
+                adapterVoltageMv: sample.adapter_voltage_mv,
+                adapterCurrentMa: sample.adapter_current_ma,
+                currentCapacityMah: sample.current_capacity,
+                maxCapacityMah: sample.max_capacity,
+                temperatureC: sample.temperature_c,
+                cycleCount: sample.cycle_count,
+                timeRemainingMin: sample.time_remaining_min,
+                sampledAt: sample.sampled_at
+              });
+            }
+          })
+          .catch(error => console.error('Error fetching battery data:', error));
+      }
+
+      // Initialize on page load
+      document.addEventListener('DOMContentLoaded', function() {
+        initPowerFlow();
+        updatePowerFlow();
+        setInterval(updatePowerFlow, 1000); // Update every second
+      });
+    </script>
   </body>
 </html>

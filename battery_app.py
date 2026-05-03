@@ -411,6 +411,18 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_file(STATIC_PATH / "styles.css", "text/css; charset=utf-8", head_only=head_only)
             return
 
+        if parsed.path.startswith("/power-flow/"):
+            subpath = parsed.path[len("/power-flow/"):]
+            file_path = STATIC_PATH / "power-flow" / subpath
+            if file_path.suffix == ".js":
+                content_type = "application/javascript; charset=utf-8"
+            elif file_path.suffix == ".html":
+                content_type = "text/html; charset=utf-8"
+            else:
+                content_type = "application/octet-stream"
+            self.send_file(file_path, content_type, head_only=head_only)
+            return
+
         self.send_error(HTTPStatus.NOT_FOUND)
 
 
