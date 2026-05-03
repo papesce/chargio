@@ -7,56 +7,17 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">⚡</div>
-        <div class="brand-copy">
-          <span>Balanced</span>
-          <h1>Battery Monitor</h1>
-          <p id="subtitle">Waiting for samples</p>
-        </div>
-      </div>
-      <div class="controls" aria-label="History range">
-        <button class="range active" data-seconds="3600">1h</button>
-        <button class="range" data-seconds="21600">6h</button>
-        <button class="range" data-seconds="86400">24h</button>
-      </div>
-    </header>
+    <nav class="view-switch" aria-label="View mode">
+      <button type="button" class="view-option active" data-view="live">Live</button>
+      <button type="button" class="view-option" data-view="details">Details</button>
+    </nav>
 
-    <main>
-      <section class="status-grid" aria-label="Current battery metrics">
-        <article class="metric primary" title="Current battery status and charge level">
-          <span title="Current battery charge level">Battery</span>
-          <strong id="percent">--</strong>
-          <small id="state" title="Charging status and power source">--</small>
-        </article>
-        <article class="metric" title="Battery power and current">
-          <span title="Current battery power flow (positive=charging, negative=discharging)">Battery Power</span>
-          <strong id="power">--</strong>
-          <small id="amperage" title="Battery current flow in milliamperes">--</small>
-        </article>
-        <article class="metric" title="Connected adapter power, voltage, and current">
-          <span title="Connected charger wattage">Adapter</span>
-          <strong id="adapter">--</strong>
-          <small id="adapter-detail" title="Adapter voltage and current">--</small>
-        </article>
-        <article class="metric" title="Battery voltage and capacity">
-          <span title="Battery voltage">Voltage</span>
-          <strong id="voltage">--</strong>
-          <small id="capacity" title="Battery capacity percentage">--</small>
-        </article>
-        <article class="metric" title="Battery temperature and cycle count">
-          <span title="Battery temperature">Temperature</span>
-          <strong id="temperature">--</strong>
-          <small id="cycles" title="Number of charge/discharge cycles">--</small>
-        </article>
-        <article class="metric" title="Estimated remaining run time and last sample time">
-          <span title="Time remaining or elapsed">Time</span>
-          <strong id="remaining">--</strong>
-          <small id="sampled" title="Timestamp of the most recent sample">--</small>
-        </article>
+    <main class="experience">
+      <section class="live-stage" id="liveMode" aria-label="Full screen live battery flow">
+        <div class="live-flow-shell" id="power-flow-container"></div>
       </section>
 
+<<<<<<< Updated upstream
       <section class="diagnosis">
         <h2>Charging Diagnosis</h2>
         <div id="diagnosis">Collecting enough data to diagnose charging behavior.</div>
@@ -74,25 +35,72 @@
             </div>
           </div>
           <div id="power-flow-container"></div>
+<<<<<<< Updated upstream
           </article>
           <article class="chart-panel chart-power-panel">
-          <div class="chart-head">
-            <div class="chart-head-main">
-              <h2>Power</h2>
-              <span>watts</span>
-              <div class="power-legend" aria-label="Power chart legend">
-                <span class="legend-item legend-item-charge" title="Battery power is positive: energy is flowing into the battery pack (charging from the adapter).">Charging</span>
-                <span class="legend-item legend-item-discharge" title="Battery power is negative: the pack is supplying the system (running from battery).">Discharging</span>
-                <span class="legend-item legend-item-switch" title="A vertical dashed line where power crossed zero between two samples (for example plug/unplug or charge direction change).">Mode switch</span>
-              </div>
-            </div>
-            <div class="chart-head-actions">
-              <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="powerLegendDialog" aria-label="About the power chart legend" title="Legend help">ⓘ</button>
-              <button type="button" class="icon-btn chart-expand" data-expand="power" aria-label="Expand power chart" title="Zoom out to full screen">⤢</button>
+=======
+        </article>
+        <article class="chart-panel chart-power-panel">
+=======
+      <section class="details-stage" id="detailsView" aria-label="Detailed battery dashboard">
+        <header class="details-header">
+          <div class="details-logo" aria-label="Balanced Battery Monitor">
+            <div class="brand-mark" aria-hidden="true">⚡</div>
+            <div class="brand-copy">
+              <span>Balanced</span>
+              <h1>Battery Monitor</h1>
             </div>
           </div>
-          <canvas id="powerChart" width="1200" height="360"></canvas>
+          <div class="details-title">
+            <span>System analytics</span>
+            <p id="subtitle">Waiting for samples</p>
+          </div>
+          <div class="controls" aria-label="History range">
+            <button class="range active" data-seconds="3600">1h</button>
+            <button class="range" data-seconds="21600">6h</button>
+            <button class="range" data-seconds="86400">24h</button>
+          </div>
+        </header>
+
+        <section class="diagnosis">
+          <h2>Charging Diagnosis</h2>
+          <div id="diagnosis">Collecting enough data to diagnose charging behavior.</div>
+        </section>
+
+        <div class="details-dashboard">
+          <div class="details-summary-column">
+          <section class="status-grid" aria-label="Current battery metrics">
+          <article class="metric primary" title="Current battery status and charge level">
+            <span title="Current battery charge level">Battery</span>
+            <strong id="percent">--</strong>
+            <small id="state" title="Charging status and power source">--</small>
           </article>
+          <article class="metric" title="Battery power and current">
+            <span title="Current battery power flow (positive=charging, negative=discharging)">Battery Power</span>
+            <strong id="power">--</strong>
+            <small id="amperage" title="Battery current flow in milliamperes">--</small>
+          </article>
+          <article class="metric" title="Connected adapter power, voltage, and current">
+            <span title="Connected charger wattage">Adapter</span>
+            <strong id="adapter">--</strong>
+            <small id="adapter-detail" title="Adapter voltage and current">--</small>
+          </article>
+          <article class="metric" title="Battery voltage and capacity">
+            <span title="Battery voltage">Voltage</span>
+            <strong id="voltage">--</strong>
+            <small id="capacity" title="Battery capacity percentage">--</small>
+          </article>
+          <article class="metric" title="Battery temperature and cycle count">
+            <span title="Battery temperature">Temperature</span>
+            <strong id="temperature">--</strong>
+            <small id="cycles" title="Number of charge/discharge cycles">--</small>
+          </article>
+          <article class="metric" title="Estimated remaining run time and last sample time">
+            <span title="Time remaining or elapsed">Time</span>
+            <strong id="remaining">--</strong>
+            <small id="sampled" title="Timestamp of the most recent sample">--</small>
+          </article>
+          </section>
           <article class="chart-panel chart-temp-panel">
           <div class="chart-head">
             <div class="chart-head-main">
@@ -110,7 +118,61 @@
           </div>
           <canvas id="tempChart" width="1200" height="300"></canvas>
           </article>
+          </div>
+          <section class="charts" aria-label="Battery history">
+          <article class="chart-panel chart-power-panel">
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
+          <div class="chart-head">
+            <div class="chart-head-main">
+              <h2>Power</h2>
+              <span>watts</span>
+              <div class="power-legend" aria-label="Power chart legend">
+                <span class="legend-item legend-item-charge" title="Battery power is positive: energy is flowing into the battery pack (charging from the adapter).">Charging</span>
+                <span class="legend-item legend-item-discharge" title="Battery power is negative: the pack is supplying the system (running from battery).">Discharging</span>
+                <span class="legend-item legend-item-switch" title="A vertical dashed line where power crossed zero between two samples (for example plug/unplug or charge direction change).">Mode switch</span>
+              </div>
+            </div>
+            <div class="chart-head-actions">
+              <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="powerLegendDialog" aria-label="About the power chart legend" title="Legend help">ⓘ</button>
+              <button type="button" class="icon-btn chart-expand" data-expand="power" aria-label="Expand power chart" title="Zoom out to full screen">⤢</button>
+            </div>
+          </div>
+          <canvas id="powerChart" width="1200" height="360"></canvas>
+<<<<<<< Updated upstream
+          </article>
+          <article class="chart-panel chart-temp-panel">
+=======
+<<<<<<< Updated upstream
+        </article>
+        <article class="chart-panel chart-temp-panel">
+>>>>>>> Stashed changes
+          <div class="chart-head">
+            <div class="chart-head-main">
+              <h2>Temperature</h2>
+              <span>celsius</span>
+              <div class="temp-legend" aria-label="Temperature chart legend">
+                <span class="legend-item legend-item-temp-comfort" title="Below 38 °C (same reference as Charging Diagnosis for warmer cells).">Comfort</span>
+                <span class="legend-item legend-item-temp-warm" title="38 °C and above: warmer cell; macOS may slow charging.">Elevated</span>
+              </div>
+            </div>
+            <div class="chart-head-actions">
+              <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="tempLegendDialog" aria-label="About the temperature chart" title="Chart legend help">ⓘ</button>
+              <button type="button" class="icon-btn chart-expand" data-expand="temp" aria-label="Expand temperature chart" title="Zoom out to full screen">⤢</button>
+            </div>
+          </div>
+          <canvas id="tempChart" width="1200" height="300"></canvas>
+<<<<<<< Updated upstream
+          </article>
           <article class="chart-panel chart-battery-panel">
+=======
+        </article>
+        <article class="chart-panel chart-battery-panel">
+=======
+          </article>
+          <article class="chart-panel chart-battery-panel">
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
           <div class="chart-head">
             <div class="chart-head-main">
               <h2>Battery</h2>
@@ -122,9 +184,36 @@
                 <span class="legend-item legend-item-switch" title="A vertical dashed line where charging state changed between two samples (charging, on battery, or external idle).">Mode switch</span>
               </div>
             </div>
+<<<<<<< Updated upstream
             <div class="chart-head-actions">
               <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="batteryLegendDialog" aria-label="About the battery chart legend" title="Legend help">ⓘ</button>
               <button type="button" class="icon-btn chart-expand" data-expand="battery" aria-label="Expand battery chart" title="Zoom out to full screen">⤢</button>
+=======
+            <button type="button" class="icon-btn legend-info-btn js-legend-help" data-legend-help="batteryLegendDialog" aria-label="About the battery chart legend" title="Legend help">ⓘ</button>
+          </div>
+          <canvas id="percentChart" width="1200" height="300"></canvas>
+<<<<<<< Updated upstream
+        </article>
+=======
+          </article>
+          </section>
+        </div>
+>>>>>>> Stashed changes
+      </section>
+    </main>
+
+    <div class="chart-focus" id="powerChartFocus" hidden>
+      <button type="button" class="chart-focus-backdrop" id="powerChartFocusBackdrop" aria-label="Close expanded chart"></button>
+      <div class="chart-focus-panel" role="dialog" aria-modal="true" aria-labelledby="powerChartFocusTitle">
+        <div class="chart-focus-head">
+          <div class="chart-head-main">
+            <h2 id="powerChartFocusTitle">Power</h2>
+            <span>watts</span>
+            <div class="power-legend" aria-label="Power chart legend">
+              <span class="legend-item legend-item-charge" title="Battery power is positive: energy is flowing into the battery pack (charging from the adapter).">Charging</span>
+              <span class="legend-item legend-item-discharge" title="Battery power is negative: the pack is supplying the system (running from battery).">Discharging</span>
+              <span class="legend-item legend-item-switch" title="A vertical dashed line where power crossed zero between two samples (for example plug/unplug or charge direction change).">Mode switch</span>
+>>>>>>> Stashed changes
             </div>
           </div>
           <canvas id="percentChart" width="1200" height="300"></canvas>
