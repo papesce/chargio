@@ -2,9 +2,19 @@ const state = {
   seconds: 3600,
   samples: [],
   collectorStatus: null,
+<<<<<<< Updated upstream
   powerFlowComponent: null,
   focusFlowComponent: null,
   focusedChart: null, // 'flow', 'power', 'temp', 'battery'
+=======
+<<<<<<< Updated upstream
+=======
+  powerFlowComponent: null,
+  focusFlowComponent: null,
+  focusedChart: null, // 'flow', 'power', 'temp', 'battery'
+  currentView: 'live',
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -121,6 +131,11 @@ function activeFilters(filters) {
   return labels;
 }
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 function initPowerFlow() {
   if (!state.powerFlowComponent && $("power-flow-container")) {
     state.powerFlowComponent = new PowerFlowComponent("power-flow-container", {
@@ -133,7 +148,11 @@ function initPowerFlow() {
 }
 
 function updatePowerFlow(sample, samples) {
+<<<<<<< Updated upstream
   if (!state.powerFlowComponent || !sample) return;
+=======
+  if (!sample) return;
+>>>>>>> Stashed changes
 
   let intensity = 1.0;
   if (sample.power_w && Math.abs(sample.power_w) > 50) {
@@ -146,7 +165,11 @@ function updatePowerFlow(sample, samples) {
     bestTimeEstimate = unpluggedEstimate;
   }
 
+<<<<<<< Updated upstream
   state.powerFlowComponent.setState({
+=======
+  const nextFlowState = {
+>>>>>>> Stashed changes
     isPluggedIn: sample.external_connected === 1 || sample.external_connected === true,
     batteryLevel: Math.round(sample.percent ?? 50),
     isCharging: sample.is_charging === 1 || sample.is_charging === true,
@@ -165,9 +188,18 @@ function updatePowerFlow(sample, samples) {
     cycleCount: sample.cycle_count,
     timeRemainingMin: bestTimeEstimate,
     sampledAt: sample.sampled_at,
+<<<<<<< Updated upstream
   });
 }
 
+=======
+  };
+
+  state.powerFlowComponent?.setState(nextFlowState);
+}
+
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   if (!sample) {
     $("subtitle").textContent = collectorError || "No samples yet";
@@ -933,6 +965,11 @@ function openChartFocus(type) {
   state.focusedChart = type;
   overlay.hidden = false;
   document.body.classList.add("chart-focus-open");
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 
   const canvas = $("focusChartCanvas");
   const flowContainer = $("focusFlowContainer");
@@ -955,7 +992,11 @@ function openChartFocus(type) {
     subtitle.textContent = 'Live power path visualization';
     helpBtn.hidden = true;
     state.focusFlowComponent = new PowerFlowComponent("focusFlowContainer", {
+<<<<<<< Updated upstream
       ...(state.powerFlowComponent ? state.powerFlowComponent.getState() : {})
+=======
+      ...(state.powerFlowComponent ? state.powerFlowComponent.getState() : {}),
+>>>>>>> Stashed changes
     });
   } else {
     canvas.hidden = false;
@@ -975,6 +1016,10 @@ function openChartFocus(type) {
     }
   }
 
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
   updateCharts();
   $("chartFocusClose")?.focus();
 }
@@ -1069,6 +1114,59 @@ document.querySelectorAll(".range").forEach((button) => {
   });
 });
 
+function setView(view, behavior = "smooth") {
+  const target = view === "details" ? $("detailsView") : $("liveMode");
+  if (!target) return;
+  state.currentView = view;
+  document.body.dataset.view = view;
+  document.querySelectorAll(".view-option").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === view);
+  });
+  target.scrollIntoView({ behavior, block: "start" });
+  window.setTimeout(updateCharts, behavior === "smooth" ? 420 : 0);
+}
+
+document.querySelectorAll(".view-option").forEach((button) => {
+  button.addEventListener("click", () => setView(button.dataset.view || "live"));
+});
+
+$("liveMode")?.addEventListener("click", () => {
+  if (state.currentView === "live") setView("details");
+});
+
+let lastLiveWheelAt = 0;
+$("liveMode")?.addEventListener("wheel", (event) => {
+  if (event.deltaY <= 18 || state.currentView !== "live") return;
+  const now = Date.now();
+  if (now - lastLiveWheelAt < 900) return;
+  lastLiveWheelAt = now;
+  setView("details");
+}, { passive: true });
+
+let touchStartY = null;
+$("liveMode")?.addEventListener("touchstart", (event) => {
+  touchStartY = event.touches[0]?.clientY ?? null;
+}, { passive: true });
+
+$("liveMode")?.addEventListener("touchend", (event) => {
+  if (touchStartY === null) return;
+  const endY = event.changedTouches[0]?.clientY ?? touchStartY;
+  if (touchStartY - endY > 44 && state.currentView === "live") setView("details");
+  touchStartY = null;
+}, { passive: true });
+
+window.addEventListener("scroll", () => {
+  const details = $("detailsView");
+  if (!details) return;
+  const view = window.scrollY >= details.offsetTop - window.innerHeight * 0.4 ? "details" : "live";
+  if (view === state.currentView) return;
+  state.currentView = view;
+  document.body.dataset.view = view;
+  document.querySelectorAll(".view-option").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === view);
+  });
+}, { passive: true });
+
 window.addEventListener("resize", updateCharts);
 
 document.querySelectorAll(".js-legend-help").forEach((button) => {
@@ -1099,4 +1197,5 @@ if (window.matchMedia) {
 }
 
 refresh();
+setView("live", "auto");
 setInterval(refresh, 5000);
