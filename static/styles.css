@@ -241,6 +241,7 @@ main {
 .charts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto;
   gap: 16px;
   margin-top: 16px;
 }
@@ -249,17 +250,27 @@ main {
   grid-column: 1 / -1;
 }
 
+.charts > .chart-power-flow-panel {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.charts > .chart-power-panel {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 .charts > .chart-temp-panel {
   grid-column: 1;
   grid-row: 2;
 }
 
-.charts > .chart-temp-stats-panel {
+.charts > .chart-battery-panel {
   grid-column: 2;
   grid-row: 2;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
 }
 
 .chart-panel {
@@ -270,6 +281,11 @@ main {
   width: 100%;
   height: 240px;
   max-height: 240px;
+}
+
+.chart-temp-panel canvas {
+  height: 180px;
+  max-height: 180px;
 }
 
 .chart-head {
@@ -343,94 +359,6 @@ main {
 
 .legend-item-temp-warm::before {
   background: var(--warn);
-}
-
-.session-side-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.session-block {
-  margin: 0;
-}
-
-.session-block-title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0;
-}
-
-.session-block-hint {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.session-dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 12px;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.session-dl dt {
-  margin: 0;
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.session-dl dd {
-  margin: 0;
-  color: var(--text);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-.temp-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.temp-stat {
-  padding: 12px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
-  text-align: center;
-}
-
-.temp-stat span {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.temp-stat strong {
-  display: block;
-  margin-top: 8px;
-  font-size: clamp(18px, 2.4vw, 24px);
-  font-weight: 700;
-  line-height: 1;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-.temp-stats-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.4;
 }
 
 .icon-btn {
@@ -629,14 +557,12 @@ canvas {
     grid-column: auto;
   }
 
+  .charts > .chart-power-flow-panel,
+  .charts > .chart-power-panel,
   .charts > .chart-temp-panel,
-  .charts > .chart-temp-stats-panel {
+  .charts > .chart-battery-panel {
     grid-column: auto;
     grid-row: auto;
-  }
-
-  .session-side-body {
-    max-height: none;
   }
 }
 
@@ -672,8 +598,24 @@ canvas {
   .status-grid {
     grid-template-columns: 1fr;
   }
+}
 
-  .temp-stats-grid {
-    grid-template-columns: 1fr;
+#power-flow-container {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 420px;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+
+#power-flow-container .power-flow-svg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  #power-flow-container {
+    min-height: 360px;
   }
 }

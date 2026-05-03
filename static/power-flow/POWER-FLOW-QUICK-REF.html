@@ -1,0 +1,248 @@
+<!-- Power Flow Component - Quick Reference Guide -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Flow Component - Quick Reference</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #1e1e1e;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 { color: #4ec9b0; margin: 30px 0 10px 0; font-size: 24px; }
+        h2 { color: #569cd6; margin: 25px 0 10px 0; font-size: 18px; }
+        h3 { color: #9cdcfe; margin: 15px 0 8px 0; font-size: 15px; }
+        
+        .section {
+            background: #2d2d30;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #569cd6;
+            border-radius: 4px;
+        }
+        
+        .code {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+            font-size: 13px;
+            color: #ce9178;
+        }
+        
+        .code-keyword { color: #569cd6; }
+        .code-string { color: #ce9178; }
+        .code-function { color: #dcdcaa; }
+        .code-number { color: #b5cea8; }
+        .code-comment { color: #6a9955; }
+        
+        .property {
+            background: #252526;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-left: 3px solid #4ec9b0;
+            border-radius: 2px;
+        }
+        
+        .property-name {
+            color: #9cdcfe;
+            font-weight: bold;
+        }
+        
+        .property-type {
+            color: #569cd6;
+            margin: 0 8px;
+        }
+        
+        .property-desc {
+            color: #a8a8a8;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .example-box {
+            background: #1e1e1e;
+            border: 1px solid #569cd6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        th {
+            background: #252526;
+            color: #569cd6;
+            font-weight: bold;
+        }
+        
+        tr:hover { background: #252526; }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        
+        .badge-method { background: #4ec9b0; color: #1e1e1e; }
+        
+        .quick-start {
+            background: linear-gradient(135deg, #2d2d30 0%, #252526 100%);
+            border: 2px solid #4ec9b0;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Power Flow Component - Quick Reference</h1>
+        <p style="color: #888; margin-bottom: 30px;">Complete API reference and code examples</p>
+
+        <!-- Quick Start -->
+        <div class="quick-start">
+            <h3>🚀 Quick Start</h3>
+            <div class="code">
+<span class="code-comment">// 1. Add script tag to HTML</span>
+<span class="code-keyword">&lt;script</span> src<span class="code-string">=</span><span class="code-string">"power-flow-component.js"</span><span class="code-keyword">&gt;&lt;/script&gt;</span>
+
+<span class="code-comment">// 2. Create container</span>
+<span class="code-keyword">&lt;div</span> id<span class="code-string">=</span><span class="code-string">"svg-container"</span><span class="code-keyword">&gt;&lt;/div&gt;</span>
+
+<span class="code-comment">// 3. Initialize component</span>
+<span class="code-keyword">const</span> component = <span class="code-keyword">new</span> <span class="code-function">PowerFlowComponent</span>(<span class="code-string">'svg-container'</span>, {
+  isPluggedIn: <span class="code-keyword">false</span>,
+  batteryLevel: <span class="code-number">75</span>,
+  amperageMa: <span class="code-number">-1200</span>
+});
+            </div>
+        </div>
+
+        <!-- Constructor -->
+        <div class="section">
+            <h2>Constructor</h2>
+            <div class="code">
+<span class="code-keyword">new</span> <span class="code-function">PowerFlowComponent</span>(containerId, initialState)
+            </div>
+
+            <h3>Full State Object Properties:</h3>
+            <table>
+                <tr>
+                    <th>Property</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+                <tr><td><code>isPluggedIn</code></td><td>boolean</td><td>Is wall power connected?</td></tr>
+                <tr><td><code>batteryLevel</code></td><td>number</td><td>Charge level (0-100)</td></tr>
+                <tr><td><code>isCharging</code></td><td>boolean</td><td>Is battery actively charging?</td></tr>
+                <tr><td><code>powerFlowIntensity</code></td><td>number</td><td>Animation speed (0.2-2.0)</td></tr>
+                <tr><td><code>voltageMv</code></td><td>number</td><td>Battery voltage in millivolts</td></tr>
+                <tr><td><code>amperageMa</code></td><td>number</td><td>Current flow (+ in, - out) in mA</td></tr>
+                <tr><td><code>powerW</code></td><td>number</td><td>Battery power in Watts</td></tr>
+                <tr><td><code>systemPowerW</code></td><td>number</td><td>Total system usage in Watts</td></tr>
+                <tr><td><code>adapterWatts</code></td><td>number</td><td>Charger capacity in Watts</td></tr>
+                <tr><td><code>temperatureC</code></td><td>number</td><td>Battery temperature in °C</td></tr>
+                <tr><td><code>cycleCount</code></td><td>number</td><td>Total battery discharge cycles</td></tr>
+                <tr><td><code>timeRemainingMin</code></td><td>number</td><td>Est. minutes remaining</td></tr>
+                <tr><td><code>sampledAt</code></td><td>string/Date</td><td>ISO timestamp of last update</td></tr>
+            </table>
+        </div>
+
+        <!-- Methods -->
+        <div class="section">
+            <h2>Methods</h2>
+
+            <h3><span class="badge badge-method">METHOD</span>setState(newState)</h3>
+            <div class="code">
+component.<span class="code-function">setState</span>({ 
+  batteryLevel: <span class="code-number">85</span>, 
+  isCharging: <span class="code-keyword">true</span>,
+  amperageMa: <span class="code-number">3200</span> 
+});
+            </div>
+            <p style="color: #a8a8a8; margin-top: 10px;">Updates component state and refreshes visuals. Merge with existing state.</p>
+
+            <h3 style="margin-top: 20px;"><span class="badge badge-method">METHOD</span>getState()</h3>
+            <div class="code">
+<span class="code-keyword">const</span> current = component.<span class="code-function">getState</span>();
+            </div>
+            <p style="color: #a8a8a8; margin-top: 10px;">Returns current state object.</p>
+
+            <h3 style="margin-top: 20px;"><span class="badge badge-method">METHOD</span>destroy()</h3>
+            <div class="code">
+component.<span class="code-function">destroy</span>();
+            </div>
+            <p style="color: #a8a8a8; margin-top: 10px;">Removes component and cleans up DOM.</p>
+        </div>
+
+        <!-- Visual Color Guide -->
+        <div class="section">
+            <h2>Visual Behavior Guide</h2>
+            <table>
+                <tr>
+                    <th>Condition</th>
+                    <th>Visual Outcome</th>
+                </tr>
+                <tr>
+                    <td><code>isPluggedIn: false</code></td>
+                    <td style="color: #facc15;">Yellow flow: Battery → Laptop</td>
+                </tr>
+                <tr>
+                    <td><code>isPluggedIn: true</code></td>
+                    <td style="color: #58a6ff;">Blue flow: Adapter → Laptop</td>
+                </tr>
+                <tr>
+                    <td><code>isCharging: true</code></td>
+                    <td style="color: #4ade80;">Green flow: Laptop → Battery</td>
+                </tr>
+                <tr>
+                    <td><code>batteryLevel <= 20</code></td>
+                    <td style="color: #ef4444;">RED ring (Critical)</td>
+                </tr>
+                <tr>
+                    <td><code>batteryLevel <= 55</code></td>
+                    <td style="color: #facc15;">YELLOW ring (Warning/Holding)</td>
+                </tr>
+                <tr>
+                    <td><code>batteryLevel > 55</code></td>
+                    <td style="color: #4ade80;">GREEN ring (Healthy)</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #3e3e42; color: #888;">
+            <p>Power Flow Component v1.0 | MIT License</p>
+        </div>
+    </div>
+</body>
+</html>
