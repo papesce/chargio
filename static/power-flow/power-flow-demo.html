@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power Flow Animation - Professional Demo</title>
+    <title>Power Flow Lab | Visualization</title>
     <style>
         :root {
-            --primary-bg: #0f172a;
-            --card-bg: #1e293b;
+            --primary-bg: #020617;
+            --dock-bg: rgba(30, 41, 59, 0.7);
             --accent-blue: #3b82f6;
             --accent-green: #22c55e;
             --accent-yellow: #eab308;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --border: #334155;
+            --border: rgba(255, 255, 255, 0.1);
+            --glass-blur: blur(12px);
         }
 
         * {
@@ -23,335 +24,380 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--primary-bg);
             color: var(--text-main);
-            min-height: 100vh;
-            padding: 20px;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
-        .layout {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 24px;
-        }
-
+        /* --- Immersive Header --- */
         header {
-            grid-column: 1 / -1;
-            text-align: center;
-            margin-bottom: 20px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 24px 40px;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         header h1 {
-            font-size: 32px;
-            font-weight: 800;
-            letter-spacing: -0.025em;
-            margin-bottom: 8px;
-        }
-
-        header p {
-            color: var(--text-muted);
-            font-size: 16px;
-        }
-
-        .animation-card {
-            background: var(--card-bg);
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            min-height: 600px;
-        }
-
-        #svg-container {
-            width: 100%;
-            height: 100%;
-        }
-
-        .controls-card {
-            background: var(--card-bg);
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            height: fit-content;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        section h3 {
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        section h3::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border);
-        }
-
-        .control-grid {
-            display: grid;
-            gap: 16px;
-        }
-
-        .field {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .field label {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        /* Toggle Buttons */
-        .toggle-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            background: var(--primary-bg);
-            padding: 4px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-        }
-
-        .toggle-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            padding: 8px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-
-        .toggle-btn.active {
-            background: var(--accent-blue);
-            color: white;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-
-        .toggle-btn.active.green {
-            background: var(--accent-green);
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
-        }
-
-        /* Sliders */
-        .slider-wrap {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            opacity: 0.8;
             display: flex;
             align-items: center;
             gap: 12px;
         }
 
-        input[type="range"] {
+        header h1 span {
+            font-weight: 400;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* --- Main Visualization --- */
+        main {
             flex: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 120px;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+        }
+
+        #svg-container {
+            width: 100%;
+            height: 100%;
+            max-width: 1200px;
+            max-height: 800px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: -40px;
+        }
+
+        /* --- Bottom Control Dock --- */
+        .dock-container {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            width: auto;
+            max-width: 95vw;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s;
+        }
+
+        .dock-container.minimized {
+            transform: translate(-50%, calc(100% - 12px));
+            opacity: 0.4;
+        }
+
+        .dock-container.minimized:hover {
+            opacity: 0.8;
+            transform: translate(-50%, calc(100% - 24px));
+        }
+
+        .dock {
+            background: var(--dock-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            width: 380px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+
+        /* Tabs / Sections */
+        .dock-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            white-space: nowrap;
+            opacity: 0.6;
+        }
+
+        /* --- Controls --- */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+/* Toggles */
+.toggle-mini {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    padding: 4px;
+    width: 100%;
+}
+
+/* Presets */
+.control-group.presets {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.preset-pill {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-mini.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-mini.active.blue { color: var(--accent-blue); background: rgba(59, 130, 246, 0.15); }
+        .btn-mini.active.green { color: var(--accent-green); background: rgba(34, 197, 94, 0.15); }
+
+        /* Sliders */
+        .slider-full {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+            padding: 4px 0;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .slider-header span:last-child {
+            color: white;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        input[type="range"] {
             -webkit-appearance: none;
+            width: 100%;
             height: 6px;
-            background: var(--primary-bg);
+            background: rgba(255, 255, 255, 0.08);
             border-radius: 3px;
             outline: none;
+            cursor: pointer;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            background: var(--accent-blue);
+            width: 16px;
+            height: 16px;
+            background: #fff;
             border-radius: 50%;
             cursor: pointer;
-            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            border: 2px solid var(--accent-blue);
+            transition: transform 0.1s ease;
         }
 
-        .val-badge {
-            min-width: 60px;
-            text-align: right;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--accent-blue);
-            font-weight: 700;
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
         }
 
         /* Presets */
-        .preset-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .preset-btn {
-            background: var(--primary-bg);
+        .preset-pill {
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border);
             color: var(--text-main);
-            padding: 12px 8px;
-            border-radius: 10px;
-            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 14px;
             font-size: 12px;
-            text-align: center;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
         }
 
-        .preset-btn:hover {
+        .preset-pill:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .preset-pill.active {
+            background: var(--accent-blue);
             border-color: var(--accent-blue);
-            background: rgba(59, 130, 246, 0.1);
+            color: white;
         }
 
-        .preset-btn.active {
-            border-color: var(--accent-blue);
-            background: rgba(59, 130, 246, 0.2);
-        }
-
-        .preset-btn strong {
-            display: block;
-            font-size: 13px;
-        }
-
-        .preset-btn span {
+        /* --- Utilities --- */
+        .dock-trigger {
+            position: absolute;
+            top: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--dock-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            padding: 4px 16px;
+            border-radius: 12px 12px 0 0;
             font-size: 10px;
             color: var(--text-muted);
+            cursor: pointer;
+            pointer-events: auto;
         }
 
-        @media (max-width: 1100px) {
-            .layout {
+        @media (max-width: 900px) {
+            .dock {
                 grid-template-columns: 1fr;
-            }
-            .controls-card {
-                order: -1;
+                gap: 20px;
+                padding: 20px;
             }
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>⚡ Power Flow Lab</h1>
-        <p>Interactive playground for the advanced battery visualization component</p>
+        <h1>⚡ Power Flow <span>Lab Edition</span></h1>
     </header>
 
-    <div class="layout">
-        <!-- Main Animation -->
-        <div class="animation-card">
-            <div id="svg-container"></div>
-        </div>
+    <main>
+        <div id="svg-container"></div>
+    </main>
 
-        <!-- Right Side Controls -->
-        <div class="controls-card">
-            <!-- Basic Status -->
-            <section>
-                <h3>System State</h3>
-                <div class="control-grid">
-                    <div class="field">
-                        <label>Power Source</label>
-                        <div class="toggle-group">
-                            <button class="toggle-btn active" id="btn-battery">🔋 Battery</button>
-                            <button class="toggle-btn" id="btn-socket">🔌 Adapter</button>
-                        </div>
+    <div class="dock-container" id="dock-container">
+        <div class="dock-trigger" id="dock-toggle">Controls</div>
+        <div class="dock">
+            <!-- System State -->
+            <div class="dock-section">
+                <span class="section-label">State</span>
+                <div class="control-group">
+                    <div class="toggle-mini">
+                        <button class="btn-mini active blue" id="btn-battery">Battery</button>
+                        <button class="btn-mini" id="btn-socket">Adapter</button>
                     </div>
-                    <div class="field">
-                        <label>Charging Action</label>
-                        <div class="toggle-group">
-                            <button class="toggle-btn active" id="btn-idle">Holding</button>
-                            <button class="toggle-btn green" id="btn-charging">Charging</button>
-                        </div>
+                    <div class="toggle-mini">
+                        <button class="btn-mini active" id="btn-idle">Hold</button>
+                        <button class="btn-mini" id="btn-charging">Charge</button>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Sliders -->
-            <section>
-                <h3>Primary Metrics</h3>
-                <div class="control-grid">
-                    <div class="field">
-                        <label>Battery Level</label>
-                        <div class="slider-wrap">
-                            <input type="range" id="input-level" min="0" max="100" value="75">
-                            <span class="val-badge" id="val-level">75%</span>
+            <!-- Primary Metrics -->
+            <div class="dock-section">
+                <span class="section-label">Metrics</span>
+                <div class="control-group">
+                    <div class="slider-full">
+                        <div class="slider-header">
+                            <span>Level</span>
+                            <span id="val-level">75%</span>
                         </div>
+                        <input type="range" id="input-level" min="0" max="100" value="75">
                     </div>
-                    <div class="field">
-                        <label>Animation Speed</label>
-                        <div class="slider-wrap">
-                            <input type="range" id="input-intensity" min="0.2" max="2" step="0.1" value="1.0">
-                            <span class="val-badge" id="val-intensity">1.0x</span>
+                    <div class="slider-full">
+                        <div class="slider-header">
+                            <span>Detected Watts</span>
+                            <span id="val-detected-adapter">140W</span>
                         </div>
+                        <input type="range" id="input-detected-adapter" min="0" max="240" step="5" value="140">
+                    </div>
+                    <div class="slider-full">
+                        <div class="slider-header">
+                            <span>Current Watts</span>
+                            <span id="val-adapter">0W</span>
+                        </div>
+                        <input type="range" id="input-adapter" min="0" max="240" value="0">
+                    </div>
+                    <div class="slider-full">
+                        <div class="slider-header">
+                            <span>Adapter Amps</span>
+                            <span id="val-adapter-amps">0mA</span>
+                        </div>
+                        <input type="range" id="input-adapter-amps" min="0" max="8000" step="50" value="0">
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <section>
-                <h3>Advanced Telemetry</h3>
-                <div class="control-grid">
-                    <div class="field">
-                        <label>Amperage (Current)</label>
-                        <div class="slider-wrap">
-                            <input type="range" id="input-amps" min="-6000" max="6000" step="50" value="-1200">
-                            <span class="val-badge" id="val-amps">-1200 mA</span>
+            <!-- Telemetry -->
+            <div class="dock-section">
+                <span class="section-label">Telemetry</span>
+                <div class="control-group">
+                    <div class="slider-full">
+                        <div class="slider-header">
+                            <span>Amps</span>
+                            <span id="val-amps">-1200mA</span>
                         </div>
+                        <input type="range" id="input-amps" min="-6000" max="6000" step="50" value="-1200">
                     </div>
-                    <div class="field">
-                        <label>Adapter Power</label>
-                        <div class="slider-wrap">
-                            <input type="range" id="input-adapter" min="0" max="140" value="0">
-                            <span class="val-badge" id="val-adapter">0 W</span>
+                    <div class="slider-full">
+                        <div class="slider-header">
+                            <span>Volts</span>
+                            <span id="val-volts">12.24V</span>
                         </div>
+                        <input type="range" id="input-volts" min="9000" max="13500" step="10" value="12240">
                     </div>
-                    <div class="field">
-                        <label>Temperature</label>
-                        <div class="slider-wrap">
-                            <input type="range" id="input-temp" min="20" max="65" step="0.5" value="32">
-                            <span class="val-badge" id="val-temp">32.0°C</span>
+                    <div class="slider-full">
+                        <div class="slider-header">
+                            <span>Temp</span>
+                            <span id="val-temp">32.0°C</span>
                         </div>
+                        <input type="range" id="input-temp" min="20" max="65" step="0.5" value="32">
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Preset Scenarios -->
-            <section>
-                <h3>Scenarios</h3>
-                <div class="preset-grid">
-                    <button class="preset-btn" data-preset="full">
-                        <strong>Healthy</strong>
-                        <span>100% • Idle</span>
-                    </button>
-                    <button class="preset-btn" data-preset="fast-charge">
-                        <strong>Turbo Charge</strong>
-                        <span>96W • Inflow</span>
-                    </button>
-                    <button class="preset-btn" data-preset="heavy-load">
-                        <strong>Extreme Load</strong>
-                        <span>Video Editing</span>
-                    </button>
-                    <button class="preset-btn" data-preset="critical">
-                        <strong>Critical</strong>
-                        <span>5% • Low Power</span>
-                    </button>
+            <!-- Scenarios -->
+            <div class="dock-section">
+                <span class="section-label">Scenarios</span>
+                <div class="control-group presets">
+                    <button class="preset-pill" data-preset="full">Idle</button>
+                    <button class="preset-pill" data-preset="fast-charge">Turbo</button>
+                    <button class="preset-pill" data-preset="heavy-load">Heavy</button>
+                    <button class="preset-pill" data-preset="critical">Low</button>
                 </div>
-            </section>
+            </div>
         </div>
     </div>
 
     <script src="power-flow-component.js"></script>
     <script>
-        // Default state with all new metrics
         const defaultState = {
             isPluggedIn: false,
             isCharging: false,
@@ -362,47 +408,79 @@
             powerW: -14.6,
             systemPowerW: 14.6,
             adapterWatts: 0,
+            detectedAdapterWatts: 140,
             adapterVoltageMv: 0,
             adapterCurrentMa: 0,
             currentCapacityMah: 4500,
             maxCapacityMah: 6000,
+            designCapacityMah: 6600,
             temperatureC: 32.0,
             cycleCount: 142,
             timeRemainingMin: 225,
             sampledAt: new Date().toISOString()
         };
 
-        // Initialize
         const comp = new PowerFlowComponent('svg-container', defaultState);
 
-        // --- Event Listeners ---
+        // --- Dock Behavior ---
+        const dock = document.getElementById('dock-container');
+        const toggle = document.getElementById('dock-toggle');
+        let autoHideTimeout;
 
-        // Toggles
+        function showDock() {
+            dock.classList.remove('minimized');
+            resetAutoHide();
+        }
+
+        function hideDock() {
+            dock.classList.add('minimized');
+        }
+
+        function resetAutoHide() {
+            clearTimeout(autoHideTimeout);
+            autoHideTimeout = setTimeout(hideDock, 6000);
+        }
+
+        toggle.onclick = (e) => {
+            e.stopPropagation();
+            if (dock.classList.contains('minimized')) showDock();
+            else hideDock();
+        };
+
+        document.body.onmousemove = (e) => {
+            if (e.clientY > window.innerHeight - 100) showDock();
+        };
+
+        // --- Event Listeners ---
         document.getElementById('btn-battery').onclick = () => updateState({ isPluggedIn: false, isCharging: false });
         document.getElementById('btn-socket').onclick = () => updateState({ isPluggedIn: true });
         document.getElementById('btn-idle').onclick = () => updateState({ isCharging: false });
         document.getElementById('btn-charging').onclick = () => updateState({ isCharging: true, isPluggedIn: true });
 
-        // Sliders
-        const bindSlider = (id, prop, transform = (v) => v, suffix = '') => {
+        const bindSlider = (id, prop, transform = (v) => v, suffix = '', formatter = (v) => v) => {
             const el = document.getElementById(`input-${id}`);
             const val = document.getElementById(`val-${id}`);
             el.oninput = (e) => {
                 const v = transform(e.target.value);
                 updateState({ [prop]: v });
-                val.textContent = `${v}${suffix}`;
+                val.textContent = `${formatter(v)}${suffix}`;
+                resetAutoHide();
             };
         };
 
         bindSlider('level', 'batteryLevel', parseInt, '%');
-        bindSlider('intensity', 'powerFlowIntensity', parseFloat, 'x');
-        bindSlider('amps', 'amperageMa', parseInt, ' mA');
-        bindSlider('adapter', 'adapterWatts', parseInt, ' W');
+        bindSlider('amps', 'amperageMa', parseInt, 'mA');
+        bindSlider('volts', 'voltageMv', parseInt, 'V', (v) => (v / 1000).toFixed(2));
+        bindSlider('detected-adapter', 'detectedAdapterWatts', parseInt, 'W');
+        bindSlider('adapter', 'adapterWatts', parseInt, 'W');
+        bindSlider('adapter-amps', 'adapterCurrentMa', parseInt, 'mA');
         bindSlider('temp', 'temperatureC', parseFloat, '°C');
 
-        // Presets
         document.querySelectorAll('[data-preset]').forEach(btn => {
-            btn.onclick = () => applyPreset(btn.dataset.preset);
+            btn.onclick = () => {
+                applyPreset(btn.dataset.preset);
+                resetAutoHide();
+            };
         });
 
         function updateState(patch) {
@@ -413,24 +491,28 @@
         function syncUI() {
             const s = comp.getState();
             
-            // Buttons
             document.getElementById('btn-battery').classList.toggle('active', !s.isPluggedIn);
             document.getElementById('btn-socket').classList.toggle('active', s.isPluggedIn);
             document.getElementById('btn-idle').classList.toggle('active', !s.isCharging);
             document.getElementById('btn-charging').classList.toggle('active', s.isCharging);
 
-            // Sliders
             document.getElementById('input-level').value = s.batteryLevel;
-            document.getElementById('val-level').textContent = `${s.batteryLevel}%`;
+            document.getElementById('val-level').textContent = `${Math.round(s.batteryLevel)}%`;
             
-            document.getElementById('input-intensity').value = s.powerFlowIntensity;
-            document.getElementById('val-intensity').textContent = `${s.powerFlowIntensity.toFixed(1)}x`;
-
             document.getElementById('input-amps').value = s.amperageMa;
-            document.getElementById('val-amps').textContent = `${s.amperageMa} mA`;
+            document.getElementById('val-amps').textContent = `${s.amperageMa}mA`;
+
+            document.getElementById('input-volts').value = s.voltageMv;
+            document.getElementById('val-volts').textContent = `${(s.voltageMv / 1000).toFixed(2)}V`;
+
+            document.getElementById('input-detected-adapter').value = s.detectedAdapterWatts || 0;
+            document.getElementById('val-detected-adapter').textContent = `${s.detectedAdapterWatts || 0}W`;
 
             document.getElementById('input-adapter').value = s.adapterWatts;
-            document.getElementById('val-adapter').textContent = `${s.adapterWatts} W`;
+            document.getElementById('val-adapter').textContent = `${s.adapterWatts}W`;
+
+            document.getElementById('input-adapter-amps').value = s.adapterCurrentMa || 0;
+            document.getElementById('val-adapter-amps').textContent = `${s.adapterCurrentMa || 0}mA`;
 
             document.getElementById('input-temp').value = s.temperatureC;
             document.getElementById('val-temp').textContent = `${s.temperatureC.toFixed(1)}°C`;
@@ -440,69 +522,26 @@
             let preset = {};
             switch(id) {
                 case 'full':
-                    preset = {
-                        isPluggedIn: false,
-                        isCharging: false,
-                        batteryLevel: 100,
-                        amperageMa: -450,
-                        powerW: -5.4,
-                        systemPowerW: 5.4,
-                        adapterWatts: 0,
-                        temperatureC: 28.5,
-                        timeRemainingMin: 840
-                    };
+                    preset = { isPluggedIn: false, isCharging: false, batteryLevel: 100, amperageMa: -450, voltageMv: 12600, temperatureC: 28.5 };
                     break;
                 case 'fast-charge':
-                    preset = {
-                        isPluggedIn: true,
-                        isCharging: true,
-                        batteryLevel: 42,
-                        amperageMa: 4800,
-                        powerW: 62.4,
-                        systemPowerW: 15.0,
-                        adapterWatts: 96,
-                        adapterVoltageMv: 20000,
-                        temperatureC: 41.5,
-                        timeRemainingMin: 45
-                    };
+                    preset = { isPluggedIn: true, isCharging: true, batteryLevel: 42, amperageMa: 4800, voltageMv: 11800, adapterWatts: 96, temperatureC: 41.5 };
                     break;
                 case 'heavy-load':
-                    preset = {
-                        isPluggedIn: false,
-                        isCharging: false,
-                        batteryLevel: 65,
-                        amperageMa: -5800,
-                        powerW: -72.0,
-                        systemPowerW: 72.0,
-                        adapterWatts: 0,
-                        temperatureC: 54.0,
-                        timeRemainingMin: 52
-                    };
+                    preset = { isPluggedIn: false, isCharging: false, batteryLevel: 65, amperageMa: -5800, voltageMv: 11200, temperatureC: 54.0 };
                     break;
                 case 'critical':
-                    preset = {
-                        isPluggedIn: false,
-                        isCharging: false,
-                        batteryLevel: 5,
-                        amperageMa: -1800,
-                        powerW: -21.0,
-                        systemPowerW: 21.0,
-                        adapterWatts: 0,
-                        temperatureC: 38.0,
-                        timeRemainingMin: 8
-                    };
+                    preset = { isPluggedIn: false, isCharging: false, batteryLevel: 5, amperageMa: -1800, voltageMv: 9800, temperatureC: 38.0 };
                     break;
             }
             updateState(preset);
-            
-            // Highlight active preset
             document.querySelectorAll('[data-preset]').forEach(b => {
                 b.classList.toggle('active', b.dataset.preset === id);
             });
         }
 
-        // Initial sync
         syncUI();
+        resetAutoHide();
     </script>
 </body>
 </html>

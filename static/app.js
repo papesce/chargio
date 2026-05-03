@@ -2,6 +2,9 @@ const state = {
   seconds: 3600,
   samples: [],
   collectorStatus: null,
+  powerFlowComponent: null,
+  focusFlowComponent: null,
+  focusedChart: null, // 'flow', 'power', 'temp', 'battery'
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -118,11 +121,63 @@ function activeFilters(filters) {
   return labels;
 }
 
+function initPowerFlow() {
+  if (!state.powerFlowComponent && $("power-flow-container")) {
+    state.powerFlowComponent = new PowerFlowComponent("power-flow-container", {
+      isPluggedIn: false,
+      batteryLevel: 50,
+      isCharging: false,
+      powerFlowIntensity: 1.0,
+    });
+  }
+}
+
+function updatePowerFlow(sample, samples) {
+  if (!state.powerFlowComponent || !sample) return;
+
+  let intensity = 1.0;
+  if (sample.power_w && Math.abs(sample.power_w) > 50) {
+    intensity = Math.min(Math.abs(sample.power_w) / 50, 2.0);
+  }
+
+  const unpluggedEstimate = estimateDischargeMinutes(sample, samples);
+  let bestTimeEstimate = sample.time_remaining_min;
+  if (!sample.external_connected && unpluggedEstimate !== null) {
+    bestTimeEstimate = unpluggedEstimate;
+  }
+
+  state.powerFlowComponent.setState({
+    isPluggedIn: sample.external_connected === 1 || sample.external_connected === true,
+    batteryLevel: Math.round(sample.percent ?? 50),
+    isCharging: sample.is_charging === 1 || sample.is_charging === true,
+    powerFlowIntensity: intensity,
+    voltageMv: sample.voltage_mv,
+    amperageMa: sample.amperage_ma,
+    powerW: sample.power_w,
+    systemPowerW: sample.system_power_w,
+    adapterWatts: sample.adapter_watts,
+    adapterVoltageMv: sample.adapter_voltage_mv,
+    adapterCurrentMa: sample.adapter_current_ma,
+    currentCapacityMah: sample.current_capacity,
+    maxCapacityMah: sample.max_capacity,
+    designCapacityMah: sample.design_capacity,
+    temperatureC: sample.temperature_c,
+    cycleCount: sample.cycle_count,
+    timeRemainingMin: bestTimeEstimate,
+    sampledAt: sample.sampled_at,
+  });
+}
+
 function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   if (!sample) {
     $("subtitle").textContent = collectorError || "No samples yet";
     return;
   }
+
+  if (!state.powerFlowComponent) {
+    initPowerFlow();
+  }
+  updatePowerFlow(sample, samples);
 
   $("percent").textContent = fmt(sample.percent, "%", 1);
   $("state").textContent = sample.external_connected
@@ -868,35 +923,126 @@ function drawTemperatureChart(canvasId, points) {
 }
 
 function powerChartExpanded() {
-  const panel = $("powerChartFocus");
-  return Boolean(panel && !panel.hidden);
+  return state.focusedChart === 'power';
 }
 
-function openPowerChartFocus() {
-  const panel = $("powerChartFocus");
-  if (!panel) return;
-  panel.hidden = false;
+function openChartFocus(type) {
+  const overlay = $("chartFocusOverlay");
+  if (!overlay) return;
+
+  state.focusedChart = type;
+  overlay.hidden = false;
   document.body.classList.add("chart-focus-open");
+
+  const canvas = $("focusChartCanvas");
+  const flowContainer = $("focusFlowContainer");
+  const title = $("chartFocusTitle");
+  const subtitle = $("chartFocusSubtitle");
+  const helpBtn = $("chartFocusHelpBtn");
+
+  // Reset visibility
+  canvas.hidden = true;
+  flowContainer.hidden = true;
+  flowContainer.innerHTML = '';
+  if (state.focusFlowComponent) {
+    state.focusFlowComponent.destroy();
+    state.focusFlowComponent = null;
+  }
+
+  if (type === 'flow') {
+    flowContainer.hidden = false;
+    title.textContent = 'Battery Flow';
+    subtitle.textContent = 'Live power path visualization';
+    helpBtn.hidden = true;
+    state.focusFlowComponent = new PowerFlowComponent("focusFlowContainer", {
+      ...(state.powerFlowComponent ? state.powerFlowComponent.getState() : {})
+    });
+  } else {
+    canvas.hidden = false;
+    helpBtn.hidden = false;
+    if (type === 'power') {
+      title.textContent = 'Power History';
+      subtitle.textContent = 'Battery power in Watts';
+      helpBtn.dataset.legendHelp = 'powerLegendDialog';
+    } else if (type === 'temp') {
+      title.textContent = 'Temperature History';
+      subtitle.textContent = 'Battery temperature in Celsius';
+      helpBtn.dataset.legendHelp = 'tempLegendDialog';
+    } else if (type === 'battery') {
+      title.textContent = 'Battery Level History';
+      subtitle.textContent = 'Charge percentage over time';
+      helpBtn.dataset.legendHelp = 'batteryLegendDialog';
+    }
+  }
+
   updateCharts();
-  $("powerChartFocusClose")?.focus();
+  $("chartFocusClose")?.focus();
 }
 
-function closePowerChartFocus() {
-  const panel = $("powerChartFocus");
-  if (!panel) return;
-  panel.hidden = true;
+function closeChartFocus() {
+  const overlay = $("chartFocusOverlay");
+  if (!overlay) return;
+  overlay.hidden = true;
   document.body.classList.remove("chart-focus-open");
-  updateCharts();
+  state.focusedChart = null;
+  if (state.focusFlowComponent) {
+    state.focusFlowComponent.destroy();
+    state.focusFlowComponent = null;
+  }
 }
 
 function updateCharts() {
   const powerPoints = series(state.samples, "power_w");
   drawPowerChart("powerChart", powerPoints);
-  if (powerChartExpanded()) {
-    drawPowerChart("powerChartExpanded", powerPoints);
+  
+  const batteryPoints = batterySeries(state.samples);
+  drawBatteryChart("percentChart", batteryPoints);
+  
+  const tempPoints = series(state.samples, "temperature_c");
+  drawTemperatureChart("tempChart", tempPoints);
+
+  if (state.focusedChart) {
+    if (state.focusedChart === 'power') {
+      drawPowerChart("focusChartCanvas", powerPoints);
+    } else if (state.focusedChart === 'temp') {
+      drawTemperatureChart("focusChartCanvas", tempPoints);
+    } else if (state.focusedChart === 'battery') {
+      drawBatteryChart("focusChartCanvas", batteryPoints);
+    } else if (state.focusedChart === 'flow' && state.focusFlowComponent && state.samples.length > 0) {
+      const last = state.samples[state.samples.length - 1];
+      const unpluggedEstimate = estimateDischargeMinutes(last, state.samples);
+      let bestTimeEstimate = last.time_remaining_min;
+      if (!last.external_connected && unpluggedEstimate !== null) {
+        bestTimeEstimate = unpluggedEstimate;
+      }
+      
+      let intensity = 1.0;
+      if (last.power_w && Math.abs(last.power_w) > 50) {
+        intensity = Math.min(Math.abs(last.power_w) / 50, 2.0);
+      }
+
+      state.focusFlowComponent.setState({
+        isPluggedIn: last.external_connected === 1 || last.external_connected === true,
+        batteryLevel: Math.round(last.percent ?? 50),
+        isCharging: last.is_charging === 1 || last.is_charging === true,
+        powerFlowIntensity: intensity,
+        voltageMv: last.voltage_mv,
+        amperageMa: last.amperage_ma,
+        powerW: last.power_w,
+        systemPowerW: last.system_power_w,
+        adapterWatts: last.adapter_watts,
+        adapterVoltageMv: last.adapter_voltage_mv,
+        adapterCurrentMa: last.adapter_current_ma,
+        currentCapacityMah: last.current_capacity,
+        maxCapacityMah: last.max_capacity,
+        designCapacityMah: last.design_capacity,
+        temperatureC: last.temperature_c,
+        cycleCount: last.cycle_count,
+        timeRemainingMin: bestTimeEstimate,
+        sampledAt: last.sampled_at,
+      });
+    }
   }
-  drawBatteryChart("percentChart", batterySeries(state.samples));
-  drawTemperatureChart("tempChart", series(state.samples, "temperature_c"));
 }
 
 async function refresh() {
@@ -935,11 +1081,17 @@ document.querySelectorAll(".js-legend-help").forEach((button) => {
   });
 });
 
-$("powerChartExpandBtn")?.addEventListener("click", openPowerChartFocus);
-$("powerChartFocusClose")?.addEventListener("click", closePowerChartFocus);
-$("powerChartFocusBackdrop")?.addEventListener("click", closePowerChartFocus);
+document.querySelectorAll(".chart-expand").forEach((button) => {
+  button.addEventListener("click", () => {
+    const type = button.dataset.expand;
+    if (type) openChartFocus(type);
+  });
+});
+
+$("chartFocusClose")?.addEventListener("click", closeChartFocus);
+$("chartFocusBackdrop")?.addEventListener("click", closeChartFocus);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && powerChartExpanded()) closePowerChartFocus();
+  if (event.key === "Escape" && state.focusedChart) closeChartFocus();
 });
 
 if (window.matchMedia) {

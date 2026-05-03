@@ -61,14 +61,18 @@ Cleans up DOM and removes the SVG.
 ## 🎨 Visual Intelligence
 
 ### 1. Energy Flow Paths
-- **Yellow Flow**: Battery is discharging (powering the laptop).
-- **Blue Flow**: Adapter is powering the laptop.
-- **Green Flow**: Adapter/Laptop is charging the battery.
+- **Yellow Flow**: Battery is discharging (powering the laptop). Speed and thickness scale with discharge magnitude (`amperageMa < 0`).
+- **Blue Flow**: Adapter is powering the laptop. Speed and thickness scale with `powerFlowIntensity`.
+- **Green Flow**: Adapter/Laptop is charging the battery. Speed and thickness scale with charge rate (`amperageMa > 0`).
 
-### 2. Battery Ring Colors
-- **Red (Critical)**: level ≤ 20%
-- **Yellow (Warning)**: level ≤ 55% OR (Plugged in and level < 99% but NOT charging)
-- **Green (Healthy)**: level > 55%
+### 2. Battery Representation
+- **Dynamic Text Color**: The percentage readout (e.g., "75%") matches the active flow color: **Yellow** (Discharge), **Green** (Charge), or **White** (Idle).
+- **Voltage Display**: Real-time battery voltage is displayed in a themed "pill" in the top-right corner.
+- **Battery Ring Colors**:
+    - **Red (Critical)**: level ≤ 20%
+    - **Yellow (Warning)**: level ≤ 55% OR (Plugged in and level < 99% but NOT charging)
+    - **Green (Healthy)**: level > 55%
+- **Temperature Cell**: A dedicated slate-blue pill at the bottom shows the current temperature.
 
 ### 3. Metric Cards
 The component automatically calculates and displays cards for:
