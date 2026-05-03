@@ -1,8 +1,8 @@
 # Balanced Battery
 
-Local macOS battery and charger monitor with near-real-time charts.
-<img width="1383" height="1081" alt="last" src="https://github.com/user-attachments/assets/de94ccce-6075-4a38-b7cc-24897f871301" />
-
+<img width="1776" height="1020" alt="Screenshot 2026-05-03 at 4 51 30 PM" src="https://github.com/user-attachments/assets/03225d0e-4f5a-41a9-8219-c67409d655b4" />
+<img width="1696" height="1029" alt="Screenshot 2026-05-03 at 4 51 40 PM" src="https://github.com/user-attachments/assets/679bd9b4-251b-4835-8942-d7e0d090e028" />
+<img width="1772" height="1040" alt="Screenshot 2026-05-03 at 4 55 35 PM" src="https://github.com/user-attachments/assets/210376fb-36ac-47c7-b1cf-fcbe6c026597" />
 
 
 ## Run
