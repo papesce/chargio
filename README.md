@@ -1,11 +1,39 @@
 # Balanced Battery
 
-<img width="1776" height="1020" alt="Screenshot 2026-05-03 at 4 51 30 PM" src="https://github.com/user-attachments/assets/03225d0e-4f5a-41a9-8219-c67409d655b4" />
-<img width="1696" height="1029" alt="Screenshot 2026-05-03 at 4 51 40 PM" src="https://github.com/user-attachments/assets/679bd9b4-251b-4835-8942-d7e0d090e028" />
-<img width="1772" height="1040" alt="Screenshot 2026-05-03 at 4 55 35 PM" src="https://github.com/user-attachments/assets/210376fb-36ac-47c7-b1cf-fcbe6c026597" />
+Balanced Battery is a local macOS battery and charger monitor with a visual live power-flow view and a detailed analytics dashboard. It samples Apple Smart Battery data, stores history in SQLite, and serves a small browser UI from a single Python script.
 
+Live mode focuses on the real-time flow of energy through the charger, laptop, and battery.
 
-## Run
+<img width="1776" height="1020" alt="Balanced Battery live view" src="https://github.com/user-attachments/assets/03225d0e-4f5a-41a9-8219-c67409d655b4" />
+
+Details mode combines the current battery state with recent charging behavior.
+
+<img width="1696" height="1029" alt="Balanced Battery details dashboard" src="https://github.com/user-attachments/assets/679bd9b4-251b-4835-8942-d7e0d090e028" />
+
+Historical charts show power direction, temperature, and charge percentage over time.
+
+<img width="1772" height="1040" alt="Balanced Battery historical charts" src="https://github.com/user-attachments/assets/210376fb-36ac-47c7-b1cf-fcbe6c026597" />
+
+## Features
+
+- Full-screen live energy-flow visualization for charger, laptop, and battery state.
+- Detailed dashboard with current metrics, charging diagnosis, and historical charts.
+- Near-real-time sampling from `ioreg -r -c AppleSmartBattery`.
+- SQLite history stored locally in `battery.sqlite3`.
+- Optional recording filters for battery percentage and absolute power.
+- No external Python dependencies.
+
+## Requirements
+
+- macOS with Apple Smart Battery data exposed through `ioreg`.
+- Python 3.10 or newer.
+- A modern browser.
+
+This app is intended to run locally. It reads local battery telemetry and serves the UI on `127.0.0.1` by default.
+
+## Quick Start
+
+Run the monitor:
 
 ```bash
 python3 battery_app.py
@@ -17,20 +45,32 @@ Open:
 http://127.0.0.1:8765
 ```
 
-The app samples `ioreg -r -c AppleSmartBattery` every 5 seconds and stores history in `battery.sqlite3`.
+The collector samples every 5 seconds and writes recorded samples to `battery.sqlite3`.
 
-## Useful Commands
+## Usage
 
-Print one parsed sample:
+Print one parsed battery sample and exit:
 
 ```bash
 python3 battery_app.py --once
 ```
 
-Run on a different port or interval:
+Run on a different port:
 
 ```bash
-python3 battery_app.py --port 8787 --interval 2
+python3 battery_app.py --port 8787
+```
+
+Use a faster sampling interval:
+
+```bash
+python3 battery_app.py --interval 2
+```
+
+Store history in a custom SQLite database:
+
+```bash
+python3 battery_app.py --db /path/to/battery.sqlite3
 ```
 
 Record history only inside a battery percentage range:
@@ -39,14 +79,58 @@ Record history only inside a battery percentage range:
 python3 battery_app.py --record-min-percent 20 --record-max-percent 80
 ```
 
-Record only samples where battery power is at least 10W in either direction:
+Record only samples where battery power is at least 10 W in either direction:
 
 ```bash
 python3 battery_app.py --record-min-abs-power 10
 ```
 
-Filters only affect SQLite history. The dashboard still shows the current live battery sample.
+Recording filters only affect SQLite history. The dashboard still shows the current live sample.
 
-## Notes
+## Interface
 
-Battery watts are derived from battery voltage and amperage. Adapter wattage is the charger capability macOS reports, not the amount entering the battery. At higher percentages, elevated temperatures, or with optimized charging enabled, observed charging watts can be much lower than the adapter rating.
+Balanced Battery has two main views:
+
+- `Live`: the default full-screen power-flow visualization.
+- `Details`: current summary metrics, charging diagnosis, and historical charts.
+
+Use the `Live` / `Details` toggle, click the live view, scroll, or swipe to move between views.
+
+## Data Model
+
+Samples include:
+
+- Battery percentage, voltage, current, power, capacity, cycle count, and temperature.
+- Charging, external power, and full-charge flags.
+- Adapter wattage, voltage, and current when macOS exposes them.
+- Estimated time remaining or time to full.
+- Raw parsed telemetry JSON for debugging.
+
+Battery power is derived from battery voltage and amperage. Adapter wattage is the charger capability macOS reports, not necessarily the watts entering the battery. At high charge levels, elevated temperatures, or with Optimized Battery Charging enabled, observed battery charging watts can be much lower than the adapter rating.
+
+## Local API
+
+The app serves a few JSON endpoints:
+
+- `GET /api/current`: latest live sample plus collector status.
+- `GET /api/history?seconds=3600`: historical samples for the requested range, clamped between 60 seconds and 7 days.
+- `GET /api/collect-now`: collect and store one immediate sample.
+
+## Project Layout
+
+```text
+battery_app.py                       Python collector, SQLite storage, and local HTTP server
+static/index.html                    Application shell
+static/app.js                        UI state, data fetching, charts, and interactions
+static/styles.css                    Application styling
+static/power-flow/                   Power-flow visualization component and reference files
+battery.sqlite3                      Local history database, created at runtime
+```
+
+## Privacy
+
+All collection and storage is local. The app does not send battery data to a remote service. If you bind the server to a non-local host with `--host`, you are responsible for access control on your network.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
