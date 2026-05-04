@@ -2,19 +2,10 @@ const state = {
   seconds: 3600,
   samples: [],
   collectorStatus: null,
-<<<<<<< Updated upstream
-  powerFlowComponent: null,
-  focusFlowComponent: null,
-  focusedChart: null, // 'flow', 'power', 'temp', 'battery'
-=======
-<<<<<<< Updated upstream
-=======
   powerFlowComponent: null,
   focusFlowComponent: null,
   focusedChart: null, // 'flow', 'power', 'temp', 'battery'
   currentView: 'live',
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -131,11 +122,6 @@ function activeFilters(filters) {
   return labels;
 }
 
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
 function initPowerFlow() {
   if (!state.powerFlowComponent && $("power-flow-container")) {
     state.powerFlowComponent = new PowerFlowComponent("power-flow-container", {
@@ -148,11 +134,7 @@ function initPowerFlow() {
 }
 
 function updatePowerFlow(sample, samples) {
-<<<<<<< Updated upstream
-  if (!state.powerFlowComponent || !sample) return;
-=======
   if (!sample) return;
->>>>>>> Stashed changes
 
   let intensity = 1.0;
   if (sample.power_w && Math.abs(sample.power_w) > 50) {
@@ -165,11 +147,7 @@ function updatePowerFlow(sample, samples) {
     bestTimeEstimate = unpluggedEstimate;
   }
 
-<<<<<<< Updated upstream
-  state.powerFlowComponent.setState({
-=======
   const nextFlowState = {
->>>>>>> Stashed changes
     isPluggedIn: sample.external_connected === 1 || sample.external_connected === true,
     batteryLevel: Math.round(sample.percent ?? 50),
     isCharging: sample.is_charging === 1 || sample.is_charging === true,
@@ -188,18 +166,11 @@ function updatePowerFlow(sample, samples) {
     cycleCount: sample.cycle_count,
     timeRemainingMin: bestTimeEstimate,
     sampledAt: sample.sampled_at,
-<<<<<<< Updated upstream
-  });
-}
-
-=======
   };
 
   state.powerFlowComponent?.setState(nextFlowState);
 }
 
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   if (!sample) {
     $("subtitle").textContent = collectorError || "No samples yet";
@@ -965,11 +936,6 @@ function openChartFocus(type) {
   state.focusedChart = type;
   overlay.hidden = false;
   document.body.classList.add("chart-focus-open");
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
 
   const canvas = $("focusChartCanvas");
   const flowContainer = $("focusFlowContainer");
@@ -992,11 +958,7 @@ function openChartFocus(type) {
     subtitle.textContent = 'Live power path visualization';
     helpBtn.hidden = true;
     state.focusFlowComponent = new PowerFlowComponent("focusFlowContainer", {
-<<<<<<< Updated upstream
-      ...(state.powerFlowComponent ? state.powerFlowComponent.getState() : {})
-=======
       ...(state.powerFlowComponent ? state.powerFlowComponent.getState() : {}),
->>>>>>> Stashed changes
     });
   } else {
     canvas.hidden = false;
@@ -1016,10 +978,6 @@ function openChartFocus(type) {
     }
   }
 
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
   updateCharts();
   $("chartFocusClose")?.focus();
 }

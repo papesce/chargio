@@ -79,7 +79,7 @@ The component automatically calculates and displays cards for:
 - **Power Source**: Current input wattage and adapter info.
 - **Battery Flow**: Net current (mA) entering or leaving the cells.
 - **Battery Health**: Current temperature and cycle count.
-- **Session**: Time remaining estimate.
+- **Remaining**: Time remaining estimate.
 
 ---
 

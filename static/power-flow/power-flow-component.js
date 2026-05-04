@@ -236,8 +236,8 @@ class PowerFlowComponent {
     group.appendChild(this.el('rect', { x: '391', y: '330', width: '118', height: '12', rx: '6', fill: 'rgba(226, 232, 240, 0.16)' }));
     group.appendChild(this.el('circle', { id: 'laptop-status-dot', cx: '450', cy: '226', r: '30', fill: 'rgba(88, 166, 255, 0.16)', class: 'breathing' }));
     group.appendChild(this.el('path', { d: 'M 431 226 H 469 M 450 207 V 245', class: 'device-stroke', opacity: '0.74' }));
-    group.appendChild(this.text('Laptop', 450, 404, 'label-body', { anchor: 'middle' }));
-    group.appendChild(this.text(this.getSourceInsight(), 450, 425, 'label-muted', { anchor: 'middle', id: 'source-insight-label' }));
+    // group.appendChild(this.text('Laptop', 450, 404, 'label-body', { anchor: 'middle' }));
+    //group.appendChild(this.text(this.getSourceInsight(), 450, 425, 'label-muted', { anchor: 'middle', id: 'source-insight-label' }));
     svg.appendChild(group);
   }
 
@@ -268,7 +268,7 @@ class PowerFlowComponent {
     group.appendChild(this.metricCard(46, 446, 190, 'Power Source', this.getSourceCardValue(), this.getSourceCardDetail(), '#58a6ff', 'source-card'));
     group.appendChild(this.metricCard(256, 446, 190, 'Battery Flow', this.getBatteryFlowValue(), this.getBatteryFlowDetail(), this.getBatteryFlowColor(), 'battery-flow-card'));
     group.appendChild(this.metricCard(466, 446, 190, 'Battery Health', this.getBatteryHealthValue(), this.getBatteryHealthDetail(), '#4ade80', 'battery-health-card'));
-    group.appendChild(this.metricCard(676, 446, 178, 'Session', this.getSessionValue(), this.getSessionDetail(), '#facc15', 'session-card'));
+    group.appendChild(this.metricCard(676, 446, 178, 'Remaining', this.getSessionValue(), this.getSessionDetail(), '#facc15', 'session-card'));
     svg.appendChild(group);
   }
 
@@ -481,7 +481,6 @@ class PowerFlowComponent {
   }
 
   getSecondaryMessage() {
-    const time = this.formatMinutes(this.state.timeRemainingMin);
     const isPluggedIn = !!this.state.isPluggedIn;
     const isCharging = !!this.state.isCharging;
     const level = Number(this.state.batteryLevel) || 0;
@@ -491,14 +490,10 @@ class PowerFlowComponent {
       return 'Power is supplied by the adapter; battery is idle.';
     }
 
-    if (time === '--') {
-      return 'Calculating estimated time...';
-    }
-    
     if (isCharging) {
-      return `Estimated ${time} until fully charged.`;
+      return 'Adapter power is flowing into the battery.';
     } else if (!isPluggedIn) {
-      return `Estimated ${time} of battery life remaining.`;
+      return 'Battery is supplying power to the system.';
     }
     return 'Battery is maintained at current level.';
   }
