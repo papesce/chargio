@@ -573,7 +573,7 @@ class PowerFlowComponent {
   }
 
   getSessionDetail() {
-    return `Sample ${this.formatSampleTime(this.state.sampledAt)}`;
+    return `Sampled ${this.formatSampleTime(this.state.sampledAt)}`;
   }
 
   getBatteryFlowColor() {
