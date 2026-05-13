@@ -251,7 +251,8 @@ def history_samples(path, seconds):
             """
             SELECT sampled_at, percent, voltage_mv, amperage_ma, instant_amperage_ma,
                    power_w, system_power_w, system_load_w, is_charging,
-                   external_connected, temperature_c, adapter_watts, time_remaining_min
+                   external_connected, temperature_c, adapter_watts,
+                   adapter_voltage_mv, adapter_current_ma, time_remaining_min
             FROM battery_samples
             WHERE sampled_at >= ?
             ORDER BY sampled_at ASC

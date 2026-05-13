@@ -105,6 +105,7 @@
                   <div class="power-legend" aria-label="Power chart legend">
                     <span class="legend-item legend-item-charge" title="Battery power is positive: energy is flowing into the battery pack (charging from the adapter).">Charging</span>
                     <span class="legend-item legend-item-discharge" title="Battery power is negative: the pack is supplying the system (running from battery).">Discharging</span>
+                    <span class="legend-item legend-item-adapter" title="Total power delivered by the adapter (adapter voltage × adapter current). Only shown while plugged in.">Adapter</span>
                     <span class="legend-item legend-item-switch" title="A vertical dashed line where power crossed zero between two samples (for example plug/unplug or charge direction change).">Mode switch</span>
                   </div>
                 </div>
@@ -169,6 +170,8 @@
         <dd>Segments where battery power is above zero: the system is drawing power into the battery from the adapter.</dd>
         <dt><span class="legend-item legend-item-discharge">Discharging</span></dt>
         <dd>Segments where battery power is below zero: the battery is feeding the system.</dd>
+        <dt><span class="legend-item legend-item-adapter">Adapter</span></dt>
+        <dd>Total power delivered by the adapter (voltage × current). The difference between adapter and battery charging power is consumed by the system.</dd>
         <dt><span class="legend-item legend-item-switch">Mode switch</span></dt>
         <dd>Dashed vertical lines mark times when power crossed zero between two samples.</dd>
       </dl>

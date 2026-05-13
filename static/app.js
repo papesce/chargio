@@ -438,7 +438,8 @@ function expandTempPointsAtThreshold(points, threshold) {
   return out;
 }
 
-function drawPowerChart(canvasId, points) {
+function drawPowerChart(canvasId, points, adapterPoints) {
+  adapterPoints = adapterPoints || [];
   const canvas = $(canvasId);
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -459,6 +460,7 @@ function drawPowerChart(canvasId, points) {
   const text = styles.getPropertyValue("--muted").trim();
   const chargeRgb = themeRgb("--good");
   const dischargeRgb = themeRgb("--warn");
+  const adapterRgb = themeRgb("--adapter");
 
   ctx.font = "12px system-ui, sans-serif";
   ctx.fillStyle = text;
@@ -476,11 +478,12 @@ function drawPowerChart(canvasId, points) {
   const expanded = expandPowerPointsWithZeroCrossings(points);
   const xs = expanded.map((p) => p.x.getTime());
   const rawYs = points.map((p) => Number(p.y));
+  const adapterYs = adapterPoints.map((p) => Number(p.y));
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
 
-  let minY = Math.min(0, ...rawYs);
-  let maxY = Math.max(0, ...rawYs);
+  let minY = Math.min(0, ...rawYs, ...adapterYs);
+  let maxY = Math.max(0, ...rawYs, ...adapterYs);
   if (minY === maxY) {
     minY -= 1;
     maxY += 1;
@@ -585,6 +588,31 @@ function drawPowerChart(canvasId, points) {
     ctx.moveTo(x0, y0);
     ctx.lineTo(x1, y1);
     ctx.stroke();
+  }
+
+  if (adapterPoints.length >= 2) {
+    ctx.strokeStyle = rgba(adapterRgb, 0.9);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 3]);
+    let drawing = false;
+    for (let i = 0; i < adapterPoints.length - 1; i += 1) {
+      const p0 = adapterPoints[i];
+      const p1 = adapterPoints[i + 1];
+      const gap = p1.x.getTime() - p0.x.getTime();
+      if (gap > 30000) {
+        drawing = false;
+        continue;
+      }
+      const x0 = xToPx(p0.x.getTime());
+      const y0 = yToPy(p0.y);
+      const x1 = xToPx(p1.x.getTime());
+      const y1 = yToPy(p1.y);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
   }
 
   const first = new Date(minX).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -994,10 +1022,20 @@ function closeChartFocus() {
   }
 }
 
+function adapterPowerSeries(samples) {
+  return samples
+    .filter((s) => s.system_power_w != null && s.system_power_w > 0 && s.external_connected)
+    .map((s) => ({
+      x: new Date(s.sampled_at),
+      y: s.system_power_w,
+    }));
+}
+
 function updateCharts() {
   const powerPoints = series(state.samples, "power_w");
-  drawPowerChart("powerChart", powerPoints);
-  
+  const adapterPoints = adapterPowerSeries(state.samples);
+  drawPowerChart("powerChart", powerPoints, adapterPoints);
+
   const batteryPoints = batterySeries(state.samples);
   drawBatteryChart("percentChart", batteryPoints);
   
@@ -1006,7 +1044,7 @@ function updateCharts() {
 
   if (state.focusedChart) {
     if (state.focusedChart === 'power') {
-      drawPowerChart("focusChartCanvas", powerPoints);
+      drawPowerChart("focusChartCanvas", powerPoints, adapterPoints);
     } else if (state.focusedChart === 'temp') {
       drawTemperatureChart("focusChartCanvas", tempPoints);
     } else if (state.focusedChart === 'battery') {

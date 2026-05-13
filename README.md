@@ -33,16 +33,17 @@ This app is intended to run locally. It reads local battery telemetry and serves
 
 ## Quick Start
 
-Run the monitor:
+```bash
+./bat start    # start in background → http://127.0.0.1:8765
+./bat stop     # stop the server
+./bat restart  # stop + start
+./bat status   # check if running
+```
+
+Or run directly in the foreground:
 
 ```bash
 python3 battery_app.py
-```
-
-Open:
-
-```text
-http://127.0.0.1:8765
 ```
 
 The collector samples every 5 seconds and writes recorded samples to `battery.sqlite3`.
