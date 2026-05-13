@@ -169,6 +169,7 @@ function updatePowerFlow(sample, samples) {
   };
 
   state.powerFlowComponent?.setState(nextFlowState);
+  state.powerFlowComponent?.setLowPowerMode(!sample.external_connected);
 }
 
 function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
@@ -1031,6 +1032,16 @@ function adapterPowerSeries(samples) {
     }));
 }
 
+let _chartRedrawScheduled = false;
+function scheduleChartRedraw() {
+  if (_chartRedrawScheduled || document.hidden) return;
+  _chartRedrawScheduled = true;
+  requestAnimationFrame(() => {
+    _chartRedrawScheduled = false;
+    updateCharts();
+  });
+}
+
 function updateCharts() {
   const powerPoints = series(state.samples, "power_w");
   const adapterPoints = adapterPowerSeries(state.samples);
@@ -1095,7 +1106,7 @@ async function refresh() {
     state.samples = history.samples || [];
     state.collectorStatus = current.collector_status ?? null;
     updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples);
-    updateCharts();
+    scheduleChartRedraw();
   } catch (error) {
     $("subtitle").textContent = error.message;
   }
@@ -1163,7 +1174,7 @@ window.addEventListener("scroll", () => {
   });
 }, { passive: true });
 
-window.addEventListener("resize", updateCharts);
+window.addEventListener("resize", scheduleChartRedraw);
 
 document.querySelectorAll(".js-legend-help").forEach((button) => {
   button.addEventListener("click", () => {
