@@ -33,14 +33,37 @@ class PowerFlowComponent {
       ...initialState
     };
 
+    this._textCache = {};
+    this._attrCache = {};
+    this._lowPowerMode = false;
+    this._dynamicsScheduled = false;
+    this._pendingDynamics = [];
+
     this.render();
   }
 
   render() {
+    this._textCache = {};
+    this._attrCache = {};
     const svg = this.createSVG();
     this.container.innerHTML = '';
     this.container.appendChild(svg);
+    this._cacheElements();
     this.updateVisualsBasedOnState();
+  }
+
+  _cacheElements() {
+    const q = (sel) => this.container.querySelector(sel);
+    this._els = {
+      'battery-ring-fill': q('#battery-ring-fill'),
+      'yellowFlow': q('#yellowFlow'),
+      'charger-card': q('#charger-card'),
+      'battery-card': q('#battery-card'),
+      'charger-to-laptop-base': q('#charger-to-laptop-base'),
+      'charger-to-laptop-flow': q('#charger-to-laptop-flow'),
+      'battery-to-laptop-flow': q('#battery-to-laptop-flow'),
+      'laptop-to-battery-flow': q('#laptop-to-battery-flow'),
+    };
   }
 
   createSVG() {
@@ -106,15 +129,6 @@ class PowerFlowComponent {
     glow.appendChild(merge);
     defs.appendChild(glow);
 
-    const shadow = this.el('filter', { id: 'cardShadow', x: '-30%', y: '-30%', width: '160%', height: '160%' });
-    shadow.appendChild(this.el('feDropShadow', {
-      dx: '0',
-      dy: '18',
-      stdDeviation: '18',
-      'flood-color': '#000',
-      'flood-opacity': '0.28'
-    }));
-    defs.appendChild(shadow);
 
     const style = this.el('style');
     style.textContent = `
@@ -159,6 +173,7 @@ class PowerFlowComponent {
       .active-flow { animation: flowForward 1.4s linear infinite; }
       .reverse-flow { animation: flowReverse 1.4s linear infinite; }
       .breathing { animation: breathe 2.6s ease-in-out infinite; }
+      .card-shadow { filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.28)); }
     `;
     defs.appendChild(style);
 
@@ -209,7 +224,7 @@ class PowerFlowComponent {
   }
 
   createCharger(svg) {
-    const group = this.el('g', { id: 'charger-group', filter: 'url(#cardShadow)' });
+    const group = this.el('g', { id: 'charger-group', class: 'card-shadow' });
     group.appendChild(this.el('rect', { id: 'charger-card', x: '62', y: '178', width: '118', height: '132', rx: '26', class: 'glass-card' }));
     group.appendChild(this.el('path', { d: 'M 112 212 L 94 250 H 116 L 102 282 L 142 236 H 119 Z', fill: 'rgba(88, 166, 255, 0.2)', stroke: '#58a6ff', 'stroke-width': '3', 'stroke-linejoin': 'round' }));
     group.appendChild(this.el('line', { x1: '89', y1: '198', x2: '89', y2: '222', class: 'muted-stroke' }));
@@ -229,7 +244,7 @@ class PowerFlowComponent {
   }
 
   createLaptop(svg) {
-    const group = this.el('g', { id: 'laptop-group', filter: 'url(#cardShadow)' });
+    const group = this.el('g', { id: 'laptop-group', class: 'card-shadow' });
     group.appendChild(this.el('rect', { x: '330', y: '150', width: '240', height: '158', rx: '18', fill: 'url(#screenGradient)', stroke: 'rgba(226, 232, 240, 0.24)', 'stroke-width': '2' }));
     group.appendChild(this.el('rect', { x: '348', y: '168', width: '204', height: '122', rx: '12', fill: 'rgba(2, 6, 23, 0.62)', stroke: 'rgba(255,255,255,0.08)' }));
     group.appendChild(this.el('path', { d: 'M 330 310 H 570 L 618 356 Q 623 362 614 362 H 286 Q 277 362 282 356 Z', fill: 'rgba(203, 213, 225, 0.16)', stroke: 'rgba(226, 232, 240, 0.22)', 'stroke-width': '2' }));
@@ -242,7 +257,7 @@ class PowerFlowComponent {
   }
 
   createBatteryHero(svg) {
-    const group = this.el('g', { id: 'battery-hero-group', filter: 'url(#cardShadow)' });
+    const group = this.el('g', { id: 'battery-hero-group', class: 'card-shadow' });
     group.appendChild(this.el('rect', { id: 'battery-card', x: '610', y: '88', width: '220', height: '290', rx: '34', class: 'glass-card' }));
     
     group.appendChild(this.el('rect', { 
@@ -281,7 +296,7 @@ class PowerFlowComponent {
   }
 
   metricCard(x, y, width, label, value, detail, accent, idPrefix) {
-    const group = this.el('g', { filter: 'url(#cardShadow)', id: idPrefix });
+    const group = this.el('g', { class: 'card-shadow', id: idPrefix });
     group.appendChild(this.el('rect', { x, y, width, height: '82', rx: '18', class: 'glass-card' }));
     group.appendChild(this.el('rect', { x: x + 14, y: y + 15, width: '4', height: '52', rx: '2', fill: accent, id: `${idPrefix}-accent` }));
     group.appendChild(this.text(label, x + 28, y + 29, 'metric-label'));
@@ -307,7 +322,7 @@ class PowerFlowComponent {
 
   updateVisualsBasedOnState() {
     const level = this.clamp(Number(this.state.batteryLevel) || 0, 0, 100);
-    const ring = this.container.querySelector('#battery-ring-fill');
+    const ring = this._els?.['battery-ring-fill'];
     const batteryColor = this.getBatteryColor();
     if (ring) {
       const circumference = 2 * Math.PI * 82;
@@ -317,7 +332,7 @@ class PowerFlowComponent {
     }
 
     // Sync yellow flow gradient and particles with battery ring color
-    const yellowFlow = this.container.querySelector('#yellowFlow');
+    const yellowFlow = this._els?.['yellowFlow'];
     if (yellowFlow) {
       const stops = yellowFlow.querySelectorAll('stop');
       if (stops.length >= 3) {
@@ -374,15 +389,14 @@ class PowerFlowComponent {
     this.setAttr('#charger-wattage-label', 'opacity', isPluggedIn ? '1' : '0');
 
     // Highlight charger border when connected
-    const chargerCard = this.container.querySelector('#charger-card');
+    const chargerCard = this._els?.['charger-card'];
     if (chargerCard) {
       chargerCard.style.stroke = isPluggedIn ? 'rgba(88, 166, 255, 0.8)' : 'rgba(255, 255, 255, 0.14)';
       chargerCard.style.strokeWidth = isPluggedIn ? '2px' : '1px';
       chargerCard.setAttribute('filter', isPluggedIn ? 'url(#softGlow)' : '');
     }
 
-    // Highlight battery border when running on battery (unplugged)
-    const batteryCard = this.container.querySelector('#battery-card');
+    const batteryCard = this._els?.['battery-card'];
     if (batteryCard) {
       const isRunningOnBattery = !isPluggedIn;
       batteryCard.style.stroke = isRunningOnBattery ? this.getBatteryColor(0.8) : 'rgba(255, 255, 255, 0.14)';
@@ -390,7 +404,7 @@ class PowerFlowComponent {
       batteryCard.setAttribute('filter', isRunningOnBattery ? 'url(#softGlow)' : '');
     }
 
-    const chargerBase = this.container.querySelector('#charger-to-laptop-base');
+    const chargerBase = this._els?.['charger-to-laptop-base'];
     if (chargerBase) {
       chargerBase.style.stroke = isPluggedIn ? 'rgba(88, 166, 255, 0.25)' : 'rgba(148, 163, 184, 0.18)';
     }
@@ -413,17 +427,32 @@ class PowerFlowComponent {
     const chargerIntensity = Math.max(0.1, (Math.abs(adapterAmps) / 6000) * 2.2 + 0.1);
     const batteryIntensity = Math.max(0.1, (Math.abs(amps) / 6000) * 2.2 + 0.1);
 
-    this.updatePathDynamics('charger-to-laptop', chargerIntensity);
-    this.updatePathDynamics('battery-to-laptop', batteryIntensity);
-    this.updatePathDynamics('laptop-to-battery', batteryIntensity);
+    this._pendingDynamics = [
+      { type: 'path', args: ['charger-to-laptop', chargerIntensity] },
+      { type: 'path', args: ['battery-to-laptop', batteryIntensity] },
+      { type: 'path', args: ['laptop-to-battery', batteryIntensity] },
+      { type: 'particle', args: [['charger-particle-a', 'charger-particle-b'], chargerIntensity] },
+      { type: 'particle', args: [['battery-particle-a', 'battery-particle-b'], batteryIntensity] },
+      { type: 'particle', args: [['charge-particle-a', 'charge-particle-b'], batteryIntensity] },
+    ];
+    this._scheduleDynamicsUpdate();
+  }
 
-    this.updateParticleDynamics(['charger-particle-a', 'charger-particle-b'], chargerIntensity);
-    this.updateParticleDynamics(['battery-particle-a', 'battery-particle-b'], batteryIntensity);
-    this.updateParticleDynamics(['charge-particle-a', 'charge-particle-b'], batteryIntensity);
+  _scheduleDynamicsUpdate() {
+    if (this._dynamicsScheduled) return;
+    this._dynamicsScheduled = true;
+    requestAnimationFrame(() => {
+      this._dynamicsScheduled = false;
+      for (const { type, args } of this._pendingDynamics) {
+        if (type === 'path') this.updatePathDynamics(...args);
+        else this.updateParticleDynamics(...args);
+      }
+      this._pendingDynamics = [];
+    });
   }
 
   updatePathDynamics(id, intensity) {
-    const path = this.container.querySelector(`#${id}-flow`);
+    const path = this._els?.[`${id}-flow`] || this.container.querySelector(`#${id}-flow`);
     if (!path) return;
     const duration = `${Math.max(0.5, 2.2 / intensity)}s`;
     const strokeWidth = 1.5 + (intensity * 3.5);
@@ -432,7 +461,8 @@ class PowerFlowComponent {
   }
 
   updateParticleDynamics(ids, intensity) {
-    const duration = `${Math.max(0.5, 2.2 / intensity)}s`;
+    const multiplier = this._lowPowerMode ? 1.5 : 1.0;
+    const duration = `${Math.max(0.5, (2.2 / intensity) * multiplier)}s`;
     const radius = 2 + (intensity * 3);
     ids.forEach(id => {
       const particle = this.container.querySelector(`#${id}`);
@@ -455,13 +485,21 @@ class PowerFlowComponent {
 
   toggleParticles(ids, active) {
     ids.forEach((id) => {
-      this.setAttr(`#${id}`, 'opacity', active ? '0.95' : '0');
-      this.setAttr(`#${id}`, 'visibility', active ? 'visible' : 'hidden');
+      const isSecondary = id.endsWith('-b');
+      const show = active && !(this._lowPowerMode && isSecondary);
+      this.setAttr(`#${id}`, 'opacity', show ? '0.95' : '0');
+      this.setAttr(`#${id}`, 'visibility', show ? 'visible' : 'hidden');
     });
   }
 
   setState(newState) {
     this.state = { ...this.state, ...newState };
+    this.updateVisualsBasedOnState();
+  }
+
+  setLowPowerMode(enabled) {
+    if (this._lowPowerMode === enabled) return;
+    this._lowPowerMode = enabled;
     this.updateVisualsBasedOnState();
   }
 
@@ -655,13 +693,20 @@ class PowerFlowComponent {
   }
 
   setText(id, value) {
-    const element = this.container.querySelector(`#${id}`);
-    if (element) element.textContent = value;
+    const v = String(value);
+    if (this._textCache[id] === v) return;
+    this._textCache[id] = v;
+    const element = this._els?.[id] || this.container.querySelector(`#${id}`);
+    if (element) element.textContent = v;
   }
 
   setAttr(selector, attr, value) {
+    const v = String(value);
+    const key = `${selector}|${attr}`;
+    if (this._attrCache[key] === v) return;
+    this._attrCache[key] = v;
     const element = this.container.querySelector(selector);
-    if (element) element.setAttribute(attr, value);
+    if (element) element.setAttribute(attr, v);
   }
 
   text(content, x, y, className, options = {}) {
