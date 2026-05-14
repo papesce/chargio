@@ -693,6 +693,32 @@ p {
   backdrop-filter: blur(20px);
 }
 
+.battery-saver-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  color: rgba(226, 232, 240, 0.74);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.battery-saver-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--good);
+}
+
+.battery-saver-toggle:has(input:checked) {
+  background: rgba(74, 222, 128, 0.15);
+  color: #fff;
+}
+
 .view-option {
   min-width: 74px;
   min-height: 36px;
@@ -757,6 +783,33 @@ body[data-view="details"] .live-flow-shell {
   opacity: 0.26;
   filter: blur(10px);
   transform: scale(0.74);
+}
+
+body.battery-saver {
+  background: #070b10;
+}
+
+body.ui-animations-paused .brand-mark,
+body.ui-animations-paused .live-flow-shell,
+body.battery-saver .brand-mark,
+body.battery-saver .live-flow-shell {
+  animation: none;
+}
+
+body.battery-saver .live-flow-shell,
+body.battery-saver[data-view="details"] .live-flow-shell {
+  filter: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+body.battery-saver .view-switch,
+body.battery-saver .controls,
+body.battery-saver .details-stage .metric,
+body.battery-saver .chart-panel,
+body.battery-saver .details-stage > .diagnosis,
+body.battery-saver .chart-focus-panel,
+body.battery-saver .legend-help-dialog {
+  backdrop-filter: none;
 }
 
 .details-title span {
@@ -1029,11 +1082,17 @@ body.chart-focus-open {
   .view-switch {
     top: 12px;
     right: 12px;
+    left: 12px;
+    justify-content: flex-end;
   }
 
   .view-option {
     min-width: 62px;
     padding: 0 12px;
+  }
+
+  .battery-saver-toggle {
+    padding: 0 10px;
   }
 
   .details-stage {
@@ -1056,5 +1115,16 @@ body.chart-focus-open {
   .battery-legend,
   .temp-legend {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
   }
 }
