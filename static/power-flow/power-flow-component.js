@@ -36,6 +36,8 @@ class PowerFlowComponent {
     this._textCache = {};
     this._attrCache = {};
     this._lowPowerMode = false;
+    this._batterySaverMode = false;
+    this._animationsEnabled = true;
     this._dynamicsScheduled = false;
     this._pendingDynamics = [];
 
@@ -48,6 +50,7 @@ class PowerFlowComponent {
     const svg = this.createSVG();
     this.container.innerHTML = '';
     this.container.appendChild(svg);
+    this._applyAnimationMode();
     this._cacheElements();
     this.updateVisualsBasedOnState();
   }
@@ -174,6 +177,21 @@ class PowerFlowComponent {
       .reverse-flow { animation: flowReverse 1.4s linear infinite; }
       .breathing { animation: breathe 2.6s ease-in-out infinite; }
       .card-shadow { filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.28)); }
+      .power-flow-svg.static-flow .active-flow,
+      .power-flow-svg.static-flow .reverse-flow,
+      .power-flow-svg.static-flow .breathing {
+        animation: none;
+      }
+      .power-flow-svg.static-flow .flow-particle {
+        display: none;
+      }
+      .power-flow-svg.static-flow .flow-path,
+      .power-flow-svg.static-flow .battery-ring-fill {
+        filter: none;
+      }
+      .power-flow-svg.static-flow .card-shadow {
+        filter: none;
+      }
     `;
     defs.appendChild(style);
 
@@ -393,7 +411,7 @@ class PowerFlowComponent {
     if (chargerCard) {
       chargerCard.style.stroke = isPluggedIn ? 'rgba(88, 166, 255, 0.8)' : 'rgba(255, 255, 255, 0.14)';
       chargerCard.style.strokeWidth = isPluggedIn ? '2px' : '1px';
-      chargerCard.setAttribute('filter', isPluggedIn ? 'url(#softGlow)' : '');
+      chargerCard.setAttribute('filter', (isPluggedIn && !this._batterySaverMode) ? 'url(#softGlow)' : '');
     }
 
     const batteryCard = this._els?.['battery-card'];
@@ -401,7 +419,7 @@ class PowerFlowComponent {
       const isRunningOnBattery = !isPluggedIn;
       batteryCard.style.stroke = isRunningOnBattery ? this.getBatteryColor(0.8) : 'rgba(255, 255, 255, 0.14)';
       batteryCard.style.strokeWidth = isRunningOnBattery ? '2px' : '1px';
-      batteryCard.setAttribute('filter', isRunningOnBattery ? 'url(#softGlow)' : '');
+      batteryCard.setAttribute('filter', (isRunningOnBattery && !this._batterySaverMode) ? 'url(#softGlow)' : '');
     }
 
     const chargerBase = this._els?.['charger-to-laptop-base'];
@@ -439,6 +457,14 @@ class PowerFlowComponent {
   }
 
   _scheduleDynamicsUpdate() {
+    if (!this._animationsEnabled || this._batterySaverMode) {
+      for (const { type, args } of this._pendingDynamics) {
+        if (type === 'path') this.updatePathDynamics(...args);
+        else this.updateParticleDynamics(...args);
+      }
+      this._pendingDynamics = [];
+      return;
+    }
     if (this._dynamicsScheduled) return;
     this._dynamicsScheduled = true;
     requestAnimationFrame(() => {
@@ -454,14 +480,15 @@ class PowerFlowComponent {
   updatePathDynamics(id, intensity) {
     const path = this._els?.[`${id}-flow`] || this.container.querySelector(`#${id}-flow`);
     if (!path) return;
-    const duration = `${Math.max(0.5, 2.2 / intensity)}s`;
-    const strokeWidth = 1.5 + (intensity * 3.5);
+    const staticMode = !this._animationsEnabled || this._batterySaverMode;
+    const duration = staticMode ? '0s' : `${Math.max(0.5, 2.2 / intensity)}s`;
+    const strokeWidth = staticMode ? 3 : 1.5 + (intensity * 3.5);
     path.style.animationDuration = duration;
     path.setAttribute('stroke-width', strokeWidth);
   }
 
   updateParticleDynamics(ids, intensity) {
-    const multiplier = this._lowPowerMode ? 1.5 : 1.0;
+    const multiplier = (this._lowPowerMode || this._batterySaverMode) ? 1.5 : 1.0;
     const duration = `${Math.max(0.5, (2.2 / intensity) * multiplier)}s`;
     const radius = 2 + (intensity * 3);
     ids.forEach(id => {
@@ -478,15 +505,16 @@ class PowerFlowComponent {
     const flow = this.container.querySelector(`#${prefix}-flow`);
     if (base) base.setAttribute('opacity', active ? '1' : '0.36');
     if (flow) {
-      flow.setAttribute('opacity', active ? '1' : '0');
-      flow.setAttribute('class', `flow-path ${active ? animationClass : ''}`.trim());
+      const staticMode = !this._animationsEnabled || this._batterySaverMode;
+      flow.setAttribute('opacity', active ? (staticMode ? '0.72' : '1') : '0');
+      flow.setAttribute('class', `flow-path ${active && !staticMode ? animationClass : ''}`.trim());
     }
   }
 
   toggleParticles(ids, active) {
     ids.forEach((id) => {
       const isSecondary = id.endsWith('-b');
-      const show = active && !(this._lowPowerMode && isSecondary);
+      const show = active && this._animationsEnabled && !this._batterySaverMode && !(this._lowPowerMode && isSecondary);
       this.setAttr(`#${id}`, 'opacity', show ? '0.95' : '0');
       this.setAttr(`#${id}`, 'visibility', show ? 'visible' : 'hidden');
     });
@@ -501,6 +529,31 @@ class PowerFlowComponent {
     if (this._lowPowerMode === enabled) return;
     this._lowPowerMode = enabled;
     this.updateVisualsBasedOnState();
+  }
+
+  setBatterySaverMode(enabled) {
+    if (this._batterySaverMode === enabled) return;
+    this._batterySaverMode = enabled;
+    this._applyAnimationMode();
+    this.updateVisualsBasedOnState();
+  }
+
+  setAnimationsEnabled(enabled) {
+    if (this._animationsEnabled === enabled) return;
+    this._animationsEnabled = enabled;
+    this._applyAnimationMode();
+    this.updateVisualsBasedOnState();
+  }
+
+  _applyAnimationMode() {
+    const svg = this.container.querySelector('svg');
+    if (!svg) return;
+    const staticMode = !this._animationsEnabled || this._batterySaverMode;
+    svg.classList.toggle('static-flow', staticMode);
+    if (typeof svg.pauseAnimations === 'function' && typeof svg.unpauseAnimations === 'function') {
+      if (staticMode) svg.pauseAnimations();
+      else svg.unpauseAnimations();
+    }
   }
 
   getState() {

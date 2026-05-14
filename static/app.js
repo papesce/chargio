@@ -6,9 +6,15 @@ const state = {
   focusFlowComponent: null,
   focusedChart: null, // 'flow', 'power', 'temp', 'battery'
   currentView: 'live',
+  batterySaver: false,
+  reducedMotion: false,
+  liveFlowVisible: true,
+  idle: false,
 };
 
 const TEMP_COMFORT_MAX_C = 38;
+const BATTERY_SAVER_STORAGE_KEY = "balancedBattery.batterySaver";
+const IDLE_ANIMATION_TIMEOUT_MS = 20000;
 
 const $ = (id) => document.getElementById(id);
 
@@ -130,7 +136,50 @@ function initPowerFlow() {
       isCharging: false,
       powerFlowIntensity: 1.0,
     });
+    syncPowerFlowAnimationMode();
   }
+}
+
+function shouldAnimateLiveFlow() {
+  return !state.batterySaver
+    && !state.reducedMotion
+    && !state.idle
+    && !document.hidden
+    && state.currentView === "live"
+    && state.liveFlowVisible;
+}
+
+function shouldAnimateFocusFlow() {
+  return !state.batterySaver
+    && !state.reducedMotion
+    && !state.idle
+    && !document.hidden
+    && state.focusedChart === "flow";
+}
+
+function syncPowerFlowAnimationMode() {
+  const lowEnergy = state.batterySaver || state.reducedMotion;
+  const liveEnabled = shouldAnimateLiveFlow();
+  document.body.classList.toggle("battery-saver", lowEnergy);
+  document.body.classList.toggle("ui-animations-paused", !liveEnabled);
+  state.powerFlowComponent?.setBatterySaverMode(lowEnergy);
+  state.powerFlowComponent?.setAnimationsEnabled(liveEnabled);
+  state.focusFlowComponent?.setBatterySaverMode(lowEnergy);
+  state.focusFlowComponent?.setAnimationsEnabled(shouldAnimateFocusFlow());
+}
+
+function setBatterySaver(enabled, persist = true) {
+  state.batterySaver = Boolean(enabled);
+  const toggle = $("batterySaverToggle");
+  if (toggle) toggle.checked = state.batterySaver;
+  if (persist) {
+    try {
+      window.localStorage?.setItem(BATTERY_SAVER_STORAGE_KEY, state.batterySaver ? "1" : "0");
+    } catch (_error) {
+      // Ignore storage failures; the in-memory setting still applies.
+    }
+  }
+  syncPowerFlowAnimationMode();
 }
 
 function updatePowerFlow(sample, samples) {
@@ -169,7 +218,8 @@ function updatePowerFlow(sample, samples) {
   };
 
   state.powerFlowComponent?.setState(nextFlowState);
-  state.powerFlowComponent?.setLowPowerMode(!sample.external_connected);
+  state.powerFlowComponent?.setLowPowerMode(!sample.external_connected || state.batterySaver || state.reducedMotion);
+  syncPowerFlowAnimationMode();
 }
 
 function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
@@ -989,6 +1039,7 @@ function openChartFocus(type) {
     state.focusFlowComponent = new PowerFlowComponent("focusFlowContainer", {
       ...(state.powerFlowComponent ? state.powerFlowComponent.getState() : {}),
     });
+    syncPowerFlowAnimationMode();
   } else {
     canvas.hidden = false;
     helpBtn.hidden = false;
@@ -1021,6 +1072,7 @@ function closeChartFocus() {
     state.focusFlowComponent.destroy();
     state.focusFlowComponent = null;
   }
+  syncPowerFlowAnimationMode();
 }
 
 function adapterPowerSeries(samples) {
@@ -1093,6 +1145,8 @@ function updateCharts() {
         timeRemainingMin: bestTimeEstimate,
         sampledAt: last.sampled_at,
       });
+      state.focusFlowComponent.setLowPowerMode(!last.external_connected || state.batterySaver || state.reducedMotion);
+      syncPowerFlowAnimationMode();
     }
   }
 }
@@ -1129,6 +1183,7 @@ function setView(view, behavior = "smooth") {
   document.querySelectorAll(".view-option").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === view);
   });
+  syncPowerFlowAnimationMode();
   target.scrollIntoView({ behavior, block: "start" });
   window.setTimeout(updateCharts, behavior === "smooth" ? 420 : 0);
 }
@@ -1172,6 +1227,7 @@ window.addEventListener("scroll", () => {
   document.querySelectorAll(".view-option").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === view);
   });
+  syncPowerFlowAnimationMode();
 }, { passive: true });
 
 window.addEventListener("resize", scheduleChartRedraw);
@@ -1200,9 +1256,75 @@ document.addEventListener("keydown", (event) => {
 });
 
 if (window.matchMedia) {
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", invalidatePowerSwitchMarkerCache);
+  const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  if (typeof colorSchemeQuery.addEventListener === "function") {
+    colorSchemeQuery.addEventListener("change", invalidatePowerSwitchMarkerCache);
+  } else if (typeof colorSchemeQuery.addListener === "function") {
+    colorSchemeQuery.addListener(invalidatePowerSwitchMarkerCache);
+  }
 }
 
+const reducedMotionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+if (reducedMotionQuery) {
+  state.reducedMotion = reducedMotionQuery.matches;
+  const handleReducedMotionChange = (event) => {
+    state.reducedMotion = event.matches;
+    syncPowerFlowAnimationMode();
+  };
+  if (typeof reducedMotionQuery.addEventListener === "function") {
+    reducedMotionQuery.addEventListener("change", handleReducedMotionChange);
+  } else if (typeof reducedMotionQuery.addListener === "function") {
+    reducedMotionQuery.addListener(handleReducedMotionChange);
+  }
+}
+
+const savedBatterySaver = (() => {
+  try {
+    return window.localStorage?.getItem(BATTERY_SAVER_STORAGE_KEY);
+  } catch (_error) {
+    return null;
+  }
+})();
+setBatterySaver(savedBatterySaver === null ? state.reducedMotion : savedBatterySaver === "1", false);
+
+$("batterySaverToggle")?.addEventListener("change", (event) => {
+  setBatterySaver(event.currentTarget.checked);
+});
+
+if ("IntersectionObserver" in window) {
+  const liveObserver = new IntersectionObserver((entries) => {
+    const entry = entries[0];
+    state.liveFlowVisible = Boolean(entry?.isIntersecting);
+    syncPowerFlowAnimationMode();
+  }, { threshold: 0.08 });
+  const live = $("liveMode");
+  if (live) liveObserver.observe(live);
+}
+
+let idleTimer = null;
+function resetAnimationIdleTimer() {
+  state.idle = false;
+  syncPowerFlowAnimationMode();
+  if (idleTimer) window.clearTimeout(idleTimer);
+  idleTimer = window.setTimeout(() => {
+    state.idle = true;
+    syncPowerFlowAnimationMode();
+  }, IDLE_ANIMATION_TIMEOUT_MS);
+}
+
+["pointerdown", "keydown", "wheel", "touchstart", "scroll"].forEach((eventName) => {
+  window.addEventListener(eventName, resetAnimationIdleTimer, { passive: true });
+});
+
+document.addEventListener("visibilitychange", () => {
+  syncPowerFlowAnimationMode();
+  if (!document.hidden) {
+    scheduleChartRedraw();
+    resetAnimationIdleTimer();
+  }
+});
+
+resetAnimationIdleTimer();
 refresh();
 setView("live", "auto");
 setInterval(refresh, 5000);

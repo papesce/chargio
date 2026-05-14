@@ -17,6 +17,7 @@ Historical charts show power direction, temperature, and charge percentage over 
 ## Features
 
 - Full-screen live energy-flow visualization for charger, laptop, and battery state.
+- Battery Saver UI mode for static, lower-energy graphics.
 - Detailed dashboard with current metrics, charging diagnosis, and historical charts.
 - Near-real-time sampling from `ioreg -r -c AppleSmartBattery`.
 - SQLite history stored locally in `battery.sqlite3`.
@@ -96,6 +97,8 @@ Balanced Battery has two main views:
 - `Details`: current summary metrics, charging diagnosis, and historical charts.
 
 Use the `Live` / `Details` toggle, click the live view, scroll, or swipe to move between views.
+
+Use `Battery Saver` to pause decorative live-flow animations and reduce heavier visual effects. The UI also uses this lower-energy mode by default when the browser reports `prefers-reduced-motion`.
 
 ## Data Model
 
