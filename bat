@@ -2,6 +2,8 @@
 # Start/stop helper for Balanced Battery
 
 PID_FILE="$(dirname "$0")/.battery.pid"
+PORT=8765
+URL="http://127.0.0.1:$PORT"
 
 case "${1:-start}" in
   start)
@@ -9,9 +11,12 @@ case "${1:-start}" in
       echo "Already running (PID $(cat "$PID_FILE"))"
       exit 1
     fi
-    python3 "$(dirname "$0")/battery_app.py" &
+    python3 "$(dirname "$0")/battery_app.py" > /dev/null 2>&1 &
     echo $! > "$PID_FILE"
-    echo "Started (PID $!) → http://127.0.0.1:8765"
+    echo "Started (PID $!) → $URL"
+    if [ "$2" = "--open" ]; then
+      open "$URL"
+    fi
     ;;
   stop)
     if [ ! -f "$PID_FILE" ]; then
@@ -43,7 +48,10 @@ case "${1:-start}" in
     ;;
   restart)
     "$0" stop 2>/dev/null
-    "$0" start
+    "$0" start "$2"
+    ;;
+  open)
+    open "$URL"
     ;;
   status)
     if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
@@ -54,7 +62,7 @@ case "${1:-start}" in
     fi
     ;;
   *)
-    echo "Usage: $0 {start|stop|kill|restart|status}"
+    echo "Usage: $0 {start|stop|kill|restart|status|open} [--open]"
     exit 1
     ;;
 esac

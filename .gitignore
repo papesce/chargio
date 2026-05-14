@@ -1,3 +1,4 @@
 battery.sqlite3
 *.pyc
 __pycache__/
+.battery.pid

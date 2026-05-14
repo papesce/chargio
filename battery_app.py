@@ -7,6 +7,7 @@ import sqlite3
 import subprocess
 import threading
 import time
+import webbrowser
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -427,7 +428,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)
 
 
-def run_server(host, port, interval, db_path, min_percent=None, max_percent=None, min_abs_power=None):
+def run_server(host, port, interval, db_path, min_percent=None, max_percent=None, min_abs_power=None, open_browser=False):
     init_db(db_path)
     collector = Collector(db_path, interval, min_percent, max_percent, min_abs_power)
     collector.start()
@@ -443,8 +444,11 @@ def run_server(host, port, interval, db_path, min_percent=None, max_percent=None
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    print(f"Battery monitor running at http://{host}:{port}")
+    url = f"http://{host}:{port}"
+    print(f"Battery monitor running at {url}")
     print(f"SQLite history: {db_path}")
+    if open_browser:
+        webbrowser.open(url)
     if any(value is not None for value in (min_percent, max_percent, min_abs_power)):
         print("Recording filters:")
         if min_percent is not None:
@@ -476,6 +480,7 @@ def main():
     parser.add_argument("--record-max-percent", type=float, help="only store samples at or below this battery percent")
     parser.add_argument("--record-min-abs-power", type=float, help="only store samples at or above this absolute battery power in watts")
     parser.add_argument("--once", action="store_true", help="print one sample and exit")
+    parser.add_argument("--open", action="store_true", help="open the browser automatically after starting")
     args = parser.parse_args()
 
     if args.once:
@@ -497,6 +502,7 @@ def main():
         args.record_min_percent,
         args.record_max_percent,
         args.record_min_abs_power,
+        args.open,
     )
 
 
