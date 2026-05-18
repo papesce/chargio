@@ -10,11 +10,19 @@ const state = {
   reducedMotion: false,
   liveFlowVisible: true,
   idle: false,
+  idleTimeoutMs: 20000,
+  wasAutoPaused: false,
+  lastInteractionTime: Date.now(),
+  windowFocused: true,
+  isMouseOver: false,
+  isPluggedIn: false,
 };
 
 const TEMP_COMFORT_MAX_C = 38;
 const BATTERY_SAVER_STORAGE_KEY = "balancedBattery.batterySaver";
-const IDLE_ANIMATION_TIMEOUT_MS = 20000;
+const IDLE_TIMEOUT_CHARGING_MS = 60000;
+const IDLE_TIMEOUT_BATTERY_MS = 20000;
+const IDLE_TIMEOUT_OBSERVATION_MS = 120000;
 
 const $ = (id) => document.getElementById(id);
 
@@ -145,6 +153,7 @@ function shouldAnimateLiveFlow() {
     && !state.reducedMotion
     && !state.idle
     && !document.hidden
+    && state.windowFocused
     && state.currentView === "live"
     && state.liveFlowVisible;
 }
@@ -154,6 +163,7 @@ function shouldAnimateFocusFlow() {
     && !state.reducedMotion
     && !state.idle
     && !document.hidden
+    && state.windowFocused
     && state.focusedChart === "flow";
 }
 
@@ -184,6 +194,12 @@ function setBatterySaver(enabled, persist = true) {
 
 function updatePowerFlow(sample, samples) {
   if (!sample) return;
+
+  const wasPluggedIn = state.isPluggedIn;
+  state.isPluggedIn = sample.external_connected === 1 || sample.external_connected === true;
+  if (wasPluggedIn !== state.isPluggedIn) {
+    resetAnimationIdleTimer();
+  }
 
   let intensity = 1.0;
   if (sample.power_w && Math.abs(sample.power_w) > 50) {
@@ -1288,7 +1304,16 @@ const savedBatterySaver = (() => {
 setBatterySaver(savedBatterySaver === null ? state.reducedMotion : savedBatterySaver === "1", false);
 
 $("batterySaverToggle")?.addEventListener("change", (event) => {
-  setBatterySaver(event.currentTarget.checked);
+  const enabled = event.currentTarget.checked;
+  // Observation mode (longer timeout) only applies when plugged in
+  if (!enabled && state.wasAutoPaused && state.isPluggedIn) {
+    state.idleTimeoutMs = IDLE_TIMEOUT_OBSERVATION_MS;
+  } else {
+    state.idleTimeoutMs = state.isPluggedIn ? IDLE_TIMEOUT_CHARGING_MS : IDLE_TIMEOUT_BATTERY_MS;
+  }
+  state.wasAutoPaused = false;
+  setBatterySaver(enabled);
+  resetAnimationIdleTimer();
 });
 
 if ("IntersectionObserver" in window) {
@@ -1304,27 +1329,88 @@ if ("IntersectionObserver" in window) {
 let idleTimer = null;
 function resetAnimationIdleTimer() {
   state.idle = false;
+  state.lastInteractionTime = Date.now();
+
+  const currentDefaultTimeout = state.isPluggedIn ? IDLE_TIMEOUT_CHARGING_MS : IDLE_TIMEOUT_BATTERY_MS;
+  // Strictly enforce battery timeout; observation mode is charging-only
+  if (state.idleTimeoutMs !== IDLE_TIMEOUT_OBSERVATION_MS || !state.isPluggedIn) {
+    state.idleTimeoutMs = currentDefaultTimeout;
+  }
+
+  if (state.wasAutoPaused && state.windowFocused && state.isMouseOver && state.isPluggedIn) {
+    state.wasAutoPaused = false;
+    setBatterySaver(false, false);
+  }
+
   syncPowerFlowAnimationMode();
   if (idleTimer) window.clearTimeout(idleTimer);
   idleTimer = window.setTimeout(() => {
     state.idle = true;
+    if (!state.batterySaver) {
+      state.wasAutoPaused = true;
+      setBatterySaver(true, false);
+    }
     syncPowerFlowAnimationMode();
-  }, IDLE_ANIMATION_TIMEOUT_MS);
+    state.idleTimeoutMs = currentDefaultTimeout;
+  }, state.idleTimeoutMs);
 }
 
-["pointerdown", "keydown", "wheel", "touchstart", "scroll"].forEach((eventName) => {
-  window.addEventListener(eventName, resetAnimationIdleTimer, { passive: true });
+function updateIdleProgressBar() {
+  const bar = $("idleProgress");
+  if (!bar) return;
+
+  if (state.idle || state.batterySaver || state.reducedMotion || !state.windowFocused || document.hidden) {
+    bar.style.width = "0%";
+    requestAnimationFrame(updateIdleProgressBar);
+    return;
+  }
+
+  const elapsed = Date.now() - state.lastInteractionTime;
+  const remaining = Math.max(0, 100 - (elapsed / state.idleTimeoutMs) * 100);
+  bar.style.width = `${remaining}%`;
+  requestAnimationFrame(updateIdleProgressBar);
+}
+
+["pointerdown", "keydown", "wheel", "touchstart", "scroll", "mousemove"].forEach((eventName) => {
+  window.addEventListener(eventName, () => {
+    if (state.isPluggedIn) resetAnimationIdleTimer();
+  }, { passive: true });
+});
+
+window.addEventListener("mouseenter", () => {
+  state.isMouseOver = true;
+  if (state.isPluggedIn) resetAnimationIdleTimer();
+});
+
+window.addEventListener("mouseleave", () => {
+  state.isMouseOver = false;
+});
+
+window.addEventListener("focus", () => {
+  state.windowFocused = true;
+  if (state.isPluggedIn) resetAnimationIdleTimer();
+});
+
+window.addEventListener("blur", () => {
+  state.windowFocused = false;
+  state.idle = true;
+  if (!state.batterySaver) {
+    state.wasAutoPaused = true;
+    setBatterySaver(true, false);
+  }
+  syncPowerFlowAnimationMode();
 });
 
 document.addEventListener("visibilitychange", () => {
   syncPowerFlowAnimationMode();
   if (!document.hidden) {
     scheduleChartRedraw();
-    resetAnimationIdleTimer();
+    if (state.isPluggedIn) resetAnimationIdleTimer();
   }
 });
 
 resetAnimationIdleTimer();
+updateIdleProgressBar();
 refresh();
 setView("live", "auto");
 setInterval(refresh, 5000);
