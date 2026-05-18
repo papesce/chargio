@@ -10,11 +10,14 @@ const state = {
   reducedMotion: false,
   liveFlowVisible: true,
   idle: false,
+  idleTimeoutMs: 20000,
+  wasAutoPaused: false,
 };
 
 const TEMP_COMFORT_MAX_C = 38;
 const BATTERY_SAVER_STORAGE_KEY = "balancedBattery.batterySaver";
-const IDLE_ANIMATION_TIMEOUT_MS = 20000;
+const IDLE_TIMEOUT_DEFAULT_MS = 20000;
+const IDLE_TIMEOUT_OBSERVATION_MS = 120000;
 
 const $ = (id) => document.getElementById(id);
 
@@ -1288,7 +1291,15 @@ const savedBatterySaver = (() => {
 setBatterySaver(savedBatterySaver === null ? state.reducedMotion : savedBatterySaver === "1", false);
 
 $("batterySaverToggle")?.addEventListener("change", (event) => {
-  setBatterySaver(event.currentTarget.checked);
+  const enabled = event.currentTarget.checked;
+  if (!enabled && state.wasAutoPaused) {
+    state.idleTimeoutMs = IDLE_TIMEOUT_OBSERVATION_MS;
+  } else {
+    state.idleTimeoutMs = IDLE_TIMEOUT_DEFAULT_MS;
+  }
+  state.wasAutoPaused = false;
+  setBatterySaver(enabled);
+  resetAnimationIdleTimer();
 });
 
 if ("IntersectionObserver" in window) {
@@ -1308,8 +1319,13 @@ function resetAnimationIdleTimer() {
   if (idleTimer) window.clearTimeout(idleTimer);
   idleTimer = window.setTimeout(() => {
     state.idle = true;
+    if (!state.batterySaver) {
+      state.wasAutoPaused = true;
+      setBatterySaver(true, false);
+    }
     syncPowerFlowAnimationMode();
-  }, IDLE_ANIMATION_TIMEOUT_MS);
+    state.idleTimeoutMs = IDLE_TIMEOUT_DEFAULT_MS;
+  }, state.idleTimeoutMs);
 }
 
 ["pointerdown", "keydown", "wheel", "touchstart", "scroll"].forEach((eventName) => {
