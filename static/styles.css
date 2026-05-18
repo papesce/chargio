@@ -694,6 +694,7 @@ p {
 }
 
 .battery-saver-toggle {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -705,6 +706,29 @@ p {
   font-weight: 700;
   cursor: pointer;
   user-select: none;
+  overflow: hidden;
+}
+
+.idle-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
+#idleProgress {
+  height: 100%;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+  transition: width 0.1s linear;
+}
+
+body.battery-saver .idle-progress-bar {
+  display: none;
 }
 
 .battery-saver-toggle input {
