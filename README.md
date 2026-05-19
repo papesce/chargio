@@ -13,8 +13,6 @@ Details mode combines the current battery state with recent charging behavior.
 
 Historical charts show power direction, temperature, and charge percentage over time.
 
-<img width="1747" height="1059" alt="Screenshot 2026-05-03 at 5 21 03 PM" src="https://github.com/user-attachments/assets/6b7250d3-198d-4459-9ee3-51426cd385c3" />
-
 ## Features
 
 - Full-screen live energy-flow visualization for charger, laptop, and battery state.
