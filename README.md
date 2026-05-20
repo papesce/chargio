@@ -3,13 +3,12 @@
 Chargio is a local macOS battery and charger monitor with a visual live power-flow view and a detailed analytics dashboard. It samples Apple Smart Battery data, stores history in SQLite, and serves a small browser UI from a single Python script.
 
 Live mode focuses on the real-time flow of energy through the charger, laptop, and battery.
-<img width="1694" height="928" alt="Screenshot 2026-05-19 at 9 45 03 AM" src="https://github.com/user-attachments/assets/287aaba2-5439-4950-a3bd-fc8e69c2ecb3" />
-
 <img width="1776" height="1020" alt="Chargio live view" src="https://github.com/user-attachments/assets/03225d0e-4f5a-41a9-8219-c67409d655b4" />
 
 Details mode combines the current battery state with recent charging behavior.
 
-<img width="1696" height="1029" alt="Chargio details dashboard" src="https://github.com/user-attachments/assets/679bd9b4-251b-4835-8942-d7e0d090e028" />
+<img width="1638" height="996" alt="Screenshot 2026-05-20 at 5 03 20 PM" src="https://github.com/user-attachments/assets/ddc4c57c-9502-4e1c-9462-95ac553ba2da" />
+
 
 
 Historical charts show power direction, temperature, and charge percentage over time.
