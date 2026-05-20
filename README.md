@@ -1,14 +1,14 @@
-# Juiced
+# Chargio
 
-Juiced is a local macOS battery and charger monitor with a visual live power-flow view and a detailed analytics dashboard. It samples Apple Smart Battery data, stores history in SQLite, and serves a small browser UI from a single Python script.
+Chargio is a local macOS battery and charger monitor with a visual live power-flow view and a detailed analytics dashboard. It samples Apple Smart Battery data, stores history in SQLite, and serves a small browser UI from a single Python script.
 
 Live mode focuses on the real-time flow of energy through the charger, laptop, and battery.
 
-<img width="1776" height="1020" alt="Juiced live view" src="https://github.com/user-attachments/assets/03225d0e-4f5a-41a9-8219-c67409d655b4" />
+<img width="1776" height="1020" alt="Chargio live view" src="https://github.com/user-attachments/assets/03225d0e-4f5a-41a9-8219-c67409d655b4" />
 
 Details mode combines the current battery state with recent charging behavior.
 
-<img width="1696" height="1029" alt="Juiced details dashboard" src="https://github.com/user-attachments/assets/679bd9b4-251b-4835-8942-d7e0d090e028" />
+<img width="1696" height="1029" alt="Chargio details dashboard" src="https://github.com/user-attachments/assets/679bd9b4-251b-4835-8942-d7e0d090e028" />
 
 Historical charts show power direction, temperature, and charge percentage over time.
 
@@ -35,16 +35,16 @@ This app is intended to run locally. It reads local battery telemetry and serves
 ## Quick Start
 
 ```bash
-./juiced start    # start in background → http://127.0.0.1:8765
-./juiced stop     # stop the server
-./juiced restart  # stop + start
-./juiced status   # check if running
+./chargio start    # start in background → http://127.0.0.1:8765
+./chargio stop     # stop the server
+./chargio restart  # stop + start
+./chargio status   # check if running
 ```
 
 Or run directly in the foreground:
 
 ```bash
-python3 juiced.py
+python3 chargio.py
 ```
 
 The collector samples every 5 seconds and writes recorded samples to `battery.sqlite3`.
@@ -54,44 +54,44 @@ The collector samples every 5 seconds and writes recorded samples to `battery.sq
 Print one parsed battery sample and exit:
 
 ```bash
-python3 juiced.py --once
+python3 chargio.py --once
 ```
 
 Run on a different port:
 
 ```bash
-python3 juiced.py --port 8787
+python3 chargio.py --port 8787
 ```
 
 Use a faster sampling interval:
 
 ```bash
-python3 juiced.py --interval 2
+python3 chargio.py --interval 2
 ```
 
 Store history in a custom SQLite database:
 
 ```bash
-python3 juiced.py --db /path/to/battery.sqlite3
+python3 chargio.py --db /path/to/battery.sqlite3
 ```
 
 Record history only inside a battery percentage range:
 
 ```bash
-python3 juiced.py --record-min-percent 20 --record-max-percent 80
+python3 chargio.py --record-min-percent 20 --record-max-percent 80
 ```
 
 Record only samples where battery power is at least 10 W in either direction:
 
 ```bash
-python3 juiced.py --record-min-abs-power 10
+python3 chargio.py --record-min-abs-power 10
 ```
 
 Recording filters only affect SQLite history. The dashboard still shows the current live sample.
 
 ## Interface
 
-Juiced has two main views:
+Chargio has two main views:
 
 - `Live`: the default full-screen power-flow visualization.
 - `Details`: current summary metrics, charging diagnosis, and historical charts.
@@ -123,7 +123,7 @@ The app serves a few JSON endpoints:
 ## Project Layout
 
 ```text
-juiced.py                            Python collector, SQLite storage, and local HTTP server
+chargio.py                           Python collector, SQLite storage, and local HTTP server
 static/index.html                    Application shell
 static/app.js                        UI state, data fetching, charts, and interactions
 static/styles.css                    Application styling
