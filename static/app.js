@@ -19,7 +19,7 @@ const state = {
 };
 
 const TEMP_COMFORT_MAX_C = 38;
-const BATTERY_SAVER_STORAGE_KEY = "juiced.batterySaver";
+const BATTERY_SAVER_STORAGE_KEY = "chargio.batterySaver";
 const IDLE_TIMEOUT_CHARGING_MS = 60000;
 const IDLE_TIMEOUT_BATTERY_MS = 20000;
 const IDLE_TIMEOUT_OBSERVATION_MS = 120000;
