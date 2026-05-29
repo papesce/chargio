@@ -34,7 +34,7 @@ This app is intended to run locally. It reads local battery telemetry and serves
 ## Quick Start
 
 ```bash
-./chargio start    # start in background -> http://127.0.0.1:8765
+./chargio start    # start in background -> http://127.0.0.1:7943
 ./chargio stop     # stop the server
 ./chargio restart  # stop + start
 ./chargio status   # check if running
@@ -91,6 +91,12 @@ Run on a different port:
 
 ```bash
 python3 chargio.py --port 8787
+```
+
+Or with the shell launcher:
+
+```bash
+CHARGIO_PORT=8787 chargio start
 ```
 
 Use a faster sampling interval:

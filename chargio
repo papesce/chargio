@@ -12,7 +12,7 @@ done
 APP_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
 PID_FILE="$APP_DIR/.battery.pid"
-PORT=8765
+PORT="${CHARGIO_PORT:-7943}"
 URL="http://127.0.0.1:$PORT"
 INSTALL_DIR="${CHARGIO_INSTALL_DIR:-$HOME/.local/bin}"
 INSTALL_PATH="$INSTALL_DIR/chargio"
@@ -30,7 +30,7 @@ case "${1:-start}" in
       fi
       exit 0
     fi
-    python3 "$APP_DIR/chargio.py" > /dev/null 2>&1 &
+    python3 "$APP_DIR/chargio.py" --port "$PORT" > /dev/null 2>&1 &
     echo $! > "$PID_FILE"
     echo "Started (PID $!) -> $URL"
     if [ "$2" = "--open" ]; then
