@@ -342,11 +342,14 @@ class PowerFlowComponent {
     const level = this.clamp(Number(this.state.batteryLevel) || 0, 0, 100);
     const ring = this._els?.['battery-ring-fill'];
     const batteryColor = this.getBatteryColor();
+    const amps = Number(this.state.amperageMa) || 0;
+    const negotiating = !!this.state.isCharging && amps <= 0;
+    const ringColor = negotiating ? '#facc15' : batteryColor;
     if (ring) {
       const circumference = 2 * Math.PI * 82;
       ring.setAttribute('stroke-dasharray', `${circumference}`);
       ring.setAttribute('stroke-dashoffset', `${circumference * (1 - level / 100)}`);
-      ring.setAttribute('stroke', batteryColor);
+      ring.setAttribute('stroke', ringColor);
     }
 
     // Sync yellow flow gradient and particles with battery ring color
@@ -385,15 +388,13 @@ class PowerFlowComponent {
     this.setText('session-card-value', this.getSessionValue());
     this.setText('session-card-detail', this.getSessionDetail());
 
-    const amps = Number(this.state.amperageMa) || 0;
     const isDischarging = amps < 0;
     const isCharging = amps > 0;
     const isPluggedIn = !!this.state.isPluggedIn;
-
-    // Sync battery percentage color with flow state
     let percentColor = '#f8fafc'; // Default white
-    if (isDischarging) percentColor = batteryColor;
+    if (isDischarging && !negotiating) percentColor = batteryColor;
     else if (isCharging) percentColor = '#4ade80'; // Green
+    else if (negotiating) percentColor = '#facc15'; // Amber
     this.setAttr('#battery-text', 'fill', percentColor);
 
     // Temperature pill - fixed slate/blue theme
@@ -566,7 +567,10 @@ class PowerFlowComponent {
 
   getPrimaryMessage() {
     if (!this.state.isPluggedIn) return 'Running on battery';
-    if (this.state.isCharging) return 'Charging through the laptop';
+    if (this.state.isCharging) {
+      const amps = Number(this.state.amperageMa) || 0;
+      return amps > 0 ? 'Charging through the laptop' : 'Preparing to charge';
+    }
     if (this.state.batteryLevel >= 99) return 'Plugged in, battery full';
     return 'Plugged in, battery holding';
   }
@@ -582,7 +586,9 @@ class PowerFlowComponent {
     }
 
     if (isCharging) {
-      return 'Adapter power is flowing into the battery.';
+      const amps = Number(this.state.amperageMa) || 0;
+      if (amps > 0) return 'Adapter power is flowing into the battery.';
+      return 'Charger connected, negotiating power delivery.';
     } else if (!isPluggedIn) {
       return 'Battery is supplying power to the system.';
     }
@@ -591,12 +597,18 @@ class PowerFlowComponent {
 
   getSourceInsight() {
     if (!this.state.isPluggedIn) return 'Battery is powering the system';
-    if (this.state.isCharging) return 'Charger powers laptop and refills battery';
+    if (this.state.isCharging) {
+      const amps = Number(this.state.amperageMa) || 0;
+      return amps > 0 ? 'Charger powers laptop and refills battery' : 'Charger negotiating power delivery';
+    }
     return 'Charger powers laptop while battery rests';
   }
 
   getBatteryStateLabel() {
-    if (this.state.isCharging) return 'Charging';
+    if (this.state.isCharging) {
+      const amps = Number(this.state.amperageMa) || 0;
+      return amps > 0 ? 'Charging' : 'Negotiating';
+    }
     if (this.state.isPluggedIn && this.state.batteryLevel >= 99) return 'Full';
     if (this.state.isPluggedIn) return 'Holding';
     return 'Discharging';
@@ -670,7 +682,9 @@ class PowerFlowComponent {
   getBatteryFlowColor() {
     const current = Number(this.state.amperageMa);
     if (Number.isNaN(current) || current === 0) return '#94a3b8';
-    return current > 0 ? '#4ade80' : this.getBatteryColor();
+    if (current > 0) return '#4ade80';
+    if (this.state.isCharging) return '#facc15'; // Amber - negotiating
+    return this.getBatteryColor();
   }
 
   getBatteryColor(alpha) {
