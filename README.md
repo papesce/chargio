@@ -34,10 +34,11 @@ This app is intended to run locally. It reads local battery telemetry and serves
 ## Quick Start
 
 ```bash
-./chargio start    # start in background → http://127.0.0.1:8765
+./chargio start    # start in background -> http://127.0.0.1:8765
 ./chargio stop     # stop the server
 ./chargio restart  # stop + start
 ./chargio status   # check if running
+./chargio open     # start if needed and open in your browser
 ```
 
 Or run directly in the foreground:
@@ -47,6 +48,36 @@ python3 chargio.py
 ```
 
 The collector samples every 5 seconds and writes recorded samples to `battery.sqlite3`.
+
+## Global CLI
+
+Install the launcher into `~/.local/bin` so `chargio` works from any terminal:
+
+```bash
+./chargio install-cli
+```
+
+If `~/.local/bin` is not already in your shell `PATH`, add it:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Then run Chargio from anywhere:
+
+```bash
+chargio start
+chargio open
+chargio stop
+chargio status
+```
+
+Remove the global command:
+
+```bash
+chargio uninstall-cli
+```
 
 ## Usage
 
