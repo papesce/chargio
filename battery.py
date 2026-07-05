@@ -97,11 +97,86 @@ def parse_inline_object(output, object_name):
     return parsed
 
 
+def collect_sample_ctypes():
+    import ctypes
+    import ctypes.util
+    import plistlib
+
+    iokit_path = ctypes.util.find_library('IOKit')
+    cf_path = ctypes.util.find_library('CoreFoundation')
+    if not iokit_path or not cf_path:
+        raise RuntimeError("Native macOS libraries not found")
+
+    iokit = ctypes.cdll.LoadLibrary(iokit_path)
+    cf = ctypes.cdll.LoadLibrary(cf_path)
+
+    iokit.IOServiceMatching.argtypes = [ctypes.c_char_p]
+    iokit.IOServiceMatching.restype = ctypes.c_void_p
+    iokit.IOServiceGetMatchingService.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+    iokit.IOServiceGetMatchingService.restype = ctypes.c_uint32
+    iokit.IORegistryEntryCreateCFProperties.argtypes = [
+        ctypes.c_uint32,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p,
+        ctypes.c_uint32
+    ]
+    iokit.IORegistryEntryCreateCFProperties.restype = ctypes.c_int32
+
+    cf.CFRelease.argtypes = [ctypes.c_void_p]
+    cf.CFPropertyListCreateData.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_long,
+        ctypes.c_ulong,
+        ctypes.c_void_p
+    ]
+    cf.CFPropertyListCreateData.restype = ctypes.c_void_p
+    cf.CFDataGetLength.argtypes = [ctypes.c_void_p]
+    cf.CFDataGetLength.restype = ctypes.c_long
+    cf.CFDataGetBytePtr.argtypes = [ctypes.c_void_p]
+    cf.CFDataGetBytePtr.restype = ctypes.c_void_p
+
+    matching = iokit.IOServiceMatching(b"AppleSmartBattery")
+    if not matching:
+        raise RuntimeError("Failed to create IOServiceMatching dictionary")
+
+    service = iokit.IOServiceGetMatchingService(0, matching)
+    if service == 0:
+        raise RuntimeError("AppleSmartBattery service not found")
+
+    properties = ctypes.c_void_p()
+    kr = iokit.IORegistryEntryCreateCFProperties(service, ctypes.byref(properties), None, 0)
+    iokit.IOObjectRelease(service)
+
+    if kr != 0 or not properties.value:
+        raise RuntimeError("Failed to read registry properties")
+
+    data_ref = cf.CFPropertyListCreateData(None, properties, 200, 0, None)
+    cf.CFRelease(properties)
+
+    if not data_ref:
+        raise RuntimeError("Failed to serialize properties to binary plist")
+
+    length = cf.CFDataGetLength(data_ref)
+    ptr = cf.CFDataGetBytePtr(data_ref)
+    raw_bytes = ctypes.string_at(ptr, length)
+    cf.CFRelease(data_ref)
+
+    return plistlib.loads(raw_bytes)
+
+
 def collect_sample():
-    output = run_command(["ioreg", "-r", "-c", "AppleSmartBattery"])
-    fields = parse_top_level_fields(output)
-    adapter = parse_inline_object(output, "AdapterDetails")
-    telemetry = parse_inline_object(output, "PowerTelemetryData")
+    try:
+        data = collect_sample_ctypes()
+        fields = data
+        adapter = data.get("AdapterDetails") or {}
+        telemetry = data.get("PowerTelemetryData") or {}
+    except Exception:
+        # Fallback to subprocess ioreg
+        output = run_command(["ioreg", "-r", "-c", "AppleSmartBattery"])
+        fields = parse_top_level_fields(output)
+        adapter = parse_inline_object(output, "AdapterDetails")
+        telemetry = parse_inline_object(output, "PowerTelemetryData")
 
     voltage_mv = int_or_none(fields.get("Voltage"))
     amperage_ma = signed_64(int_or_none(fields.get("Amperage")))
