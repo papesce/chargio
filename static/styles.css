@@ -138,21 +138,31 @@ h2 {
   font-size: 14px;
 }
 
-.refresh-ring {
-  display: inline-block;
-  vertical-align: middle;
-  margin-right: 6px;
+#timeFooter {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+  font-weight: 400;
 }
 
-.refresh-ring-bg {
-  stroke: var(--muted);
-  opacity: 0.3;
+#timeFooter.footer-updating {
+  color: var(--accent);
+  font-weight: 600;
 }
 
-.refresh-ring-fg {
-  stroke: var(--adapter);
-  transition: stroke-dashoffset 0.2s linear;
+#timeFooter.footer-first {
+  color: var(--muted);
+  font-weight: 400;
+  font-style: italic;
 }
+
+#timeFooter.footer-updating {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+
 
 .controls {
   display: flex;
@@ -1156,6 +1166,23 @@ body.chart-focus-open {
   .temp-legend {
     display: none;
   }
+}
+
+.chart-tooltip {
+  position: fixed;
+  z-index: 100;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-family: system-ui, sans-serif;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: nowrap;
+  transform: translate(10px, -50%);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 @media (prefers-reduced-motion: reduce) {

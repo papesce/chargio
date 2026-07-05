@@ -17,6 +17,7 @@ const state = {
   isMouseOver: false,
   isPluggedIn: false,
   lastRefreshTime: 0,
+  chartHover: { canvasId: null, pointIndex: -1, point: null },
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -24,7 +25,8 @@ const BATTERY_SAVER_STORAGE_KEY = "chargio.batterySaver";
 const IDLE_TIMEOUT_CHARGING_MS = 60000;
 const IDLE_TIMEOUT_BATTERY_MS = 20000;
 const IDLE_TIMEOUT_OBSERVATION_MS = 120000;
-const REFRESH_INTERVAL_MS = 30000;
+const POLL_TARGET_SECOND = 2; // Poll at :02 of each minute (1s after backend samples at :01)
+let countdownIntervalId = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,6 +38,32 @@ function fmt(value, suffix = "", digits = 1) {
 function fmtInt(value, suffix = "") {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "--";
   return `${Math.round(Number(value))}${suffix}`;
+}
+
+function secondsUntilNextPoll() {
+  const s = new Date().getSeconds();
+  return (POLL_TARGET_SECOND - s + 60) % 60;
+}
+
+function updateCountdownText() {
+  const el = $("timeFooter");
+  if (!el) return;
+
+  const secs = secondsUntilNextPoll();
+  const isFirstReading = state.samples.length === 0;
+
+  if (secs === 0) {
+    el.textContent = isFirstReading ? "Reading…" : "Updating…";
+    el.className = "footer-updating";
+  } else if (isFirstReading) {
+    el.textContent = `First reading in ${secs}s`;
+    el.className = "footer-first";
+  } else {
+    el.textContent = `Next update in ${secs}s`;
+    el.className = "footer-quiet";
+  }
+
+  state.powerFlowComponent?.updateCountdown(secs);
 }
 
 function localTime(iso) {
@@ -265,15 +293,16 @@ function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   $("capacity").textContent = `${fmtInt(sample.current_capacity)} / ${fmtInt(sample.max_capacity)} mAh`;
   $("temperature").textContent = fmt(sample.temperature_c, " C", 1);
   $("cycles").textContent = `${fmtInt(sample.cycle_count)} cycles`;
+  $("timeLabel").textContent = sample.external_connected ? "Time to full" : "Time remaining";
   const unpluggedEstimate = estimateDischargeMinutes(sample, samples);
   if (!sample.external_connected) {
     const estimate = unpluggedEstimate ?? sample.time_remaining_min;
     const label = minutesLabel(estimate);
-    $("remaining").textContent = label === "--" ? "--" : `${label} est`;
+    $("remaining").textContent = label === "--" ? "Calculating…" : label;
   } else {
-    $("remaining").textContent = minutesLabel(sample.time_remaining_min);
+    const label = minutesLabel(sample.time_remaining_min);
+    $("remaining").textContent = label === "--" ? "Calculating…" : label;
   }
-  $("sampledText").textContent = `sampled ${localTime(sample.sampled_at)}`;
   const filters = activeFilters(collectorStatus?.filters);
   const recordingText = collectorStatus?.last_skip_reason
     ? `live ${localTime(sample.sampled_at)}; not recording, ${collectorStatus.last_skip_reason}`
@@ -339,6 +368,116 @@ function batterySegmentCategory(point) {
   if (point.isCharging) return "charge";
   if (!point.externalConnected) return "battery";
   return "external";
+}
+
+const chartDataCache = {};
+
+function cacheChartData(canvasId, points, pad, plotW, plotH, minX, maxX, minY, maxY, extra) {
+  chartDataCache[canvasId] = { points, pad, plotW, plotH, minX, maxX, minY, maxY, ...(extra || {}) };
+}
+
+function getCanvasMousePos(canvas, event) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top, rect };
+}
+
+function findNearestIndex(data, mx, my) {
+  const { points, pad, plotW, plotH, minX, maxX, minY, maxY } = data;
+  if (!points || points.length < 2) return -1;
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < points.length; i += 1) {
+    const p = points[i];
+    const px = pad.left + ((p.x.getTime() - minX) / Math.max(1, maxX - minX)) * plotW;
+    const py = pad.top + (1 - ((Number(p.y) - minY) / (maxY - minY))) * plotH;
+    const dx = mx - px;
+    const dy = my - py;
+    const dist = dx * dx + dy * dy;
+    if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+  }
+  return bestDist <= 2500 ? bestIdx : -1;
+}
+
+function findNearestAdapterWatt(adapterPoints, timeMs) {
+  if (!adapterPoints || adapterPoints.length === 0) return null;
+  let best = null;
+  let bestDist = Infinity;
+  for (const ap of adapterPoints) {
+    const d = Math.abs(ap.x.getTime() - timeMs);
+    if (d < bestDist) { bestDist = d; best = ap; }
+  }
+  return bestDist < 600000 ? best.y : null;
+}
+
+function formatTooltipText(point, canvasId, adapterPoints) {
+  const time = point.x.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const val = Number(point.y).toFixed(1);
+  let suffix = "";
+  if (canvasId === "powerChart") suffix = " W";
+  else if (canvasId === "percentChart") suffix = "%";
+  else if (canvasId === "tempChart") suffix = " °C";
+  else if (canvasId === "focusChartCanvas") {
+    if (state.focusedChart === "power") suffix = " W";
+    else if (state.focusedChart === "battery") suffix = "%";
+    else if (state.focusedChart === "temp") suffix = " °C";
+  }
+  let result = `${time} · ${val}${suffix}`;
+  if ((canvasId === "powerChart" || (canvasId === "focusChartCanvas" && state.focusedChart === "power")) && adapterPoints) {
+    const adapterW = findNearestAdapterWatt(adapterPoints, point.x.getTime());
+    if (adapterW !== null) {
+      result += `  (adapter: ${adapterW.toFixed(0)} W)`;
+    }
+  }
+  return result;
+}
+
+const $tooltip = () => document.getElementById("chartTooltip");
+
+function showTooltip(event, text) {
+  const el = $tooltip();
+  if (!el) return;
+  el.textContent = text;
+  el.hidden = false;
+  let left = event.clientX + 10;
+  let top = event.clientY;
+  const bw = el.offsetWidth;
+  const bh = el.offsetHeight;
+  if (left + bw > window.innerWidth - 10) left = event.clientX - bw - 10;
+  if (top + bh / 2 > window.innerHeight - 10) top = window.innerHeight - 10 - bh / 2;
+  if (top - bh / 2 < 10) top = 10 + bh / 2;
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
+function hideTooltip() {
+  const el = $tooltip();
+  if (el) el.hidden = true;
+}
+
+function drawHoverOnChart(canvasId, ctx, pad, plotW, plotH) {
+  const hover = state.chartHover;
+  if (!hover || hover.canvasId !== canvasId || hover.pointIndex < 0) return;
+  const data = chartDataCache[canvasId];
+  if (!data || !data.points[hover.pointIndex]) return;
+  const point = data.points[hover.pointIndex];
+  const px = pad.left + ((point.x.getTime() - data.minX) / Math.max(1, data.maxX - data.minX)) * plotW;
+  const py = pad.top + (1 - ((Number(point.y) - data.minY) / (data.maxY - data.minY))) * plotH;
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(px, pad.top);
+  ctx.lineTo(px, pad.top + plotH);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(px, py, 4, 0, 2 * Math.PI);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.6)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawChart(canvasId, points, options = {}) {
@@ -415,6 +554,8 @@ function drawChart(canvasId, points, options = {}) {
   ctx.textAlign = "right";
   ctx.fillText(last, width - pad.right, height - 8);
   ctx.textAlign = "left";
+  cacheChartData(canvasId, points, pad, plotW, plotH, minX, maxX, minY, maxY);
+  drawHoverOnChart(canvasId, ctx, pad, plotW, plotH);
 }
 
 function themeRgb(varName) {
@@ -692,6 +833,8 @@ function drawPowerChart(canvasId, points, adapterPoints) {
   ctx.textAlign = "right";
   ctx.fillText(last, width - pad.right, height - 8);
   ctx.textAlign = "left";
+  cacheChartData(canvasId, points, pad, plotW, plotH, minX, maxX, minY, maxY, { adapterPoints });
+  drawHoverOnChart(canvasId, ctx, pad, plotW, plotH);
 }
 
 function drawBatteryChart(canvasId, points) {
@@ -856,6 +999,8 @@ function drawBatteryChart(canvasId, points) {
   ctx.textAlign = "right";
   ctx.fillText(last, width - pad.right, height - 8);
   ctx.textAlign = "left";
+  cacheChartData(canvasId, points, pad, plotW, plotH, minX, maxX, 0, 100);
+  drawHoverOnChart(canvasId, ctx, pad, plotW, plotH);
 }
 
 function drawTemperatureChart(canvasId, points) {
@@ -1020,6 +1165,8 @@ function drawTemperatureChart(canvasId, points) {
   ctx.textAlign = "right";
   ctx.fillText(last, width - pad.right, height - 8);
   ctx.textAlign = "left";
+  cacheChartData(canvasId, points, pad, plotW, plotH, minX, maxX, minY, maxY);
+  drawHoverOnChart(canvasId, ctx, pad, plotW, plotH);
 }
 
 function powerChartExpanded() {
@@ -1368,23 +1515,13 @@ function resetAnimationIdleTimer() {
 }
 
 function updateRefreshIndicator() {
-  const ring = $("refreshRingFg");
-  if (!ring) { requestAnimationFrame(updateRefreshIndicator); return; }
-
-  if (!state.lastRefreshTime) {
-    ring.setAttribute("stroke-dashoffset", "0");
-    requestAnimationFrame(updateRefreshIndicator);
-    return;
+  if (state.lastRefreshTime) {
+    const elapsed = Date.now() - state.lastRefreshTime;
+    const progress = Math.min(1, elapsed / 60000);
+    state.powerFlowComponent?.updateRefreshRing(progress);
   }
 
-  const elapsed = Date.now() - state.lastRefreshTime;
-  const progress = Math.min(1, elapsed / REFRESH_INTERVAL_MS);
-  const circumference = 31.416;
-  const offset = circumference * progress;
-  ring.setAttribute("stroke-dashoffset", String(offset));
-
-  state.powerFlowComponent?.updateRefreshRing(progress);
-
+  updateCountdownText();
   requestAnimationFrame(updateRefreshIndicator);
 }
 
@@ -1442,9 +1579,60 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+function setupChartInteraction(canvasId) {
+  const canvas = $(canvasId);
+  if (!canvas) return;
+  canvas.addEventListener("mousemove", (event) => {
+    const data = chartDataCache[canvasId];
+    if (!data || !data.points || data.points.length < 2) return;
+    const { x: mx, y: my } = getCanvasMousePos(canvas, event);
+    const idx = findNearestIndex(data, mx, my);
+    if (idx !== state.chartHover.pointIndex || state.chartHover.canvasId !== canvasId) {
+      state.chartHover.canvasId = canvasId;
+      state.chartHover.pointIndex = idx;
+      state.chartHover.point = idx >= 0 ? data.points[idx] : null;
+      if (idx >= 0) {
+        showTooltip(event, formatTooltipText(data.points[idx], canvasId, data.adapterPoints));
+      } else {
+        hideTooltip();
+      }
+      scheduleChartRedraw();
+    } else if (idx >= 0) {
+      showTooltip(event, formatTooltipText(data.points[idx], canvasId, data.adapterPoints));
+    }
+  });
+  canvas.addEventListener("mouseleave", () => {
+    if (state.chartHover.canvasId === canvasId) {
+      state.chartHover.canvasId = null;
+      state.chartHover.pointIndex = -1;
+      state.chartHover.point = null;
+      hideTooltip();
+      scheduleChartRedraw();
+    }
+  });
+}
+
+setupChartInteraction("powerChart");
+setupChartInteraction("percentChart");
+setupChartInteraction("tempChart");
+setupChartInteraction("focusChartCanvas");
+
 resetAnimationIdleTimer();
 updateIdleProgressBar();
 updateRefreshIndicator();
-refresh();
 setView("live", "auto");
-setInterval(refresh, REFRESH_INTERVAL_MS);
+
+function startCountdownCycle() {
+  refresh();
+  countdownIntervalId = setInterval(() => {
+    if (secondsUntilNextPoll() === 0) {
+      refresh();
+    }
+  }, 1000);
+}
+
+startCountdownCycle();
+
+window.addEventListener("beforeunload", () => {
+  if (countdownIntervalId) clearInterval(countdownIntervalId);
+});

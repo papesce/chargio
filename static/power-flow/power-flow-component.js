@@ -67,6 +67,7 @@ class PowerFlowComponent {
       'battery-to-laptop-flow': q('#battery-to-laptop-flow'),
       'laptop-to-battery-flow': q('#laptop-to-battery-flow'),
       'session-card-ring-fg': q('#session-card-ring-fg'),
+      'session-card-countdown': q('#session-card-countdown'),
     };
   }
 
@@ -321,6 +322,14 @@ class PowerFlowComponent {
       'id': 'session-card-ring-fg',
       transform: `rotate(-90 ${ringX} ${ringY})`,
       style: 'transition: stroke-dashoffset 0.2s linear'
+    }));
+    ringGroup.appendChild(this.el('text', {
+      x: '722', y: '512',
+      fill: 'rgba(148, 163, 184, 0.6)',
+      'font-size': '10',
+      'font-family': 'inherit',
+      'id': 'session-card-countdown',
+      'text-anchor': 'start'
     }));
     sessionCard.appendChild(ringGroup);
     const detailEl = sessionCard.querySelector('#session-card-detail');
@@ -821,6 +830,27 @@ class PowerFlowComponent {
     if (!ring) return;
     const circumference = 31.416;
     ring.setAttribute('stroke-dashoffset', String(circumference * progress));
+  }
+
+  updateCountdown(seconds) {
+    const el = this._els?.['session-card-countdown'];
+    if (!el) return;
+    if (seconds === 0) {
+      el.textContent = '…';
+      el.setAttribute('fill', '#44b39b');
+      el.setAttribute('font-size', '11');
+      el.setAttribute('font-weight', '700');
+    } else if (seconds <= 10) {
+      el.textContent = `T-${seconds}`;
+      el.setAttribute('fill', '#db8355');
+      el.setAttribute('font-size', '11');
+      el.setAttribute('font-weight', '700');
+    } else {
+      el.textContent = `${seconds}s`;
+      el.setAttribute('fill', 'rgba(148, 163, 184, 0.6)');
+      el.setAttribute('font-size', '10');
+      el.setAttribute('font-weight', '400');
+    }
   }
 
   clamp(value, min, max) {
