@@ -66,8 +66,7 @@ class PowerFlowComponent {
       'charger-to-laptop-flow': q('#charger-to-laptop-flow'),
       'battery-to-laptop-flow': q('#battery-to-laptop-flow'),
       'laptop-to-battery-flow': q('#laptop-to-battery-flow'),
-      'session-card-ring-fg': q('#session-card-ring-fg'),
-      'session-card-countdown': q('#session-card-countdown'),
+    
     };
   }
 
@@ -303,37 +302,7 @@ class PowerFlowComponent {
     group.appendChild(this.metricCard(46, 446, 190, 'Power Source', this.getSourceCardValue(), this.getSourceCardDetail(), '#58a6ff', 'source-card'));
     group.appendChild(this.metricCard(256, 446, 190, 'Battery Flow', this.getBatteryFlowValue(), this.getBatteryFlowDetail(), this.getBatteryFlowColor(), 'battery-flow-card'));
     group.appendChild(this.metricCard(466, 446, 190, 'Battery Health', this.getBatteryHealthValue(), this.getBatteryHealthDetail(), '#4ade80', 'battery-health-card'));
-    group.appendChild(this.metricCard(676, 446, 178, 'Remaining', this.getSessionValue(), this.getSessionDetail(), '#facc15', 'session-card'));
-
-    const sessionCard = group.lastElementChild;
-    const ringX = 708, ringY = 514;
-    const ringGroup = this.el('g', { id: 'session-refresh-ring' });
-    ringGroup.appendChild(this.el('circle', {
-      cx: ringX, cy: ringY, r: '5',
-      fill: 'none', 'stroke-width': '2', 'stroke-linecap': 'round',
-      stroke: 'rgba(148, 163, 184, 0.3)'
-    }));
-    ringGroup.appendChild(this.el('circle', {
-      cx: ringX, cy: ringY, r: '5',
-      fill: 'none', 'stroke-width': '2', 'stroke-linecap': 'round',
-      stroke: '#58a6ff',
-      'stroke-dasharray': '31.416',
-      'stroke-dashoffset': '0',
-      'id': 'session-card-ring-fg',
-      transform: `rotate(-90 ${ringX} ${ringY})`,
-      style: 'transition: stroke-dashoffset 0.2s linear'
-    }));
-    ringGroup.appendChild(this.el('text', {
-      x: '722', y: '512',
-      fill: 'rgba(148, 163, 184, 0.6)',
-      'font-size': '10',
-      'font-family': 'inherit',
-      'id': 'session-card-countdown',
-      'text-anchor': 'start'
-    }));
-    sessionCard.appendChild(ringGroup);
-    const detailEl = sessionCard.querySelector('#session-card-detail');
-    if (detailEl) detailEl.setAttribute('x', '720');
+    group.appendChild(this.metricCard(676, 446, 178, this.getSessionLabel(), this.getSessionValue(), '', '#facc15', 'session-card'));
 
     svg.appendChild(group);
   }
@@ -418,7 +387,6 @@ class PowerFlowComponent {
     this.setText('battery-health-card-detail', this.getBatteryHealthDetail());
     this.setText('battery-health-card-tooltip', this.getBatteryHealthTooltip());
     this.setText('session-card-value', this.getSessionValue());
-    this.setText('session-card-detail', this.getSessionDetail());
 
     const isPluggedIn = !!this.state.isPluggedIn;
     const isCharging = isPluggedIn && (this.state.isCharging || amps > 0);
@@ -460,6 +428,7 @@ class PowerFlowComponent {
     }
 
     this.setAttr('#battery-flow-card-accent', 'fill', this.getBatteryFlowColor());
+    this.setAttr('#session-card-accent', 'fill', isPluggedIn ? '#4ade80' : '#facc15');
     this.setAttr('#laptop-status-dot', 'fill', isPluggedIn ? 'rgba(88, 166, 255, 0.18)' : 'rgba(250, 204, 21, 0.18)');
 
     const adapterAmps = this.getChargerToLaptopCurrentMa();
@@ -695,6 +664,10 @@ class PowerFlowComponent {
     return `Full Charge Capacity: ${this.formatInteger(max)} mAh / Design Capacity: ${this.formatInteger(design)} mAh`;
   }
 
+  getSessionLabel() {
+    return this.state.isPluggedIn ? 'Time to full' : 'Time remaining';
+  }
+
   getSessionValue() {
     return this.formatMinutes(this.state.timeRemainingMin);
   }
@@ -825,32 +798,8 @@ class PowerFlowComponent {
     return element;
   }
 
-  updateRefreshRing(progress) {
-    const ring = this._els?.['session-card-ring-fg'];
-    if (!ring) return;
-    const circumference = 31.416;
-    ring.setAttribute('stroke-dashoffset', String(circumference * progress));
-  }
-
-  updateCountdown(seconds) {
-    const el = this._els?.['session-card-countdown'];
-    if (!el) return;
-    if (seconds === 0) {
-      el.textContent = '…';
-      el.setAttribute('fill', '#44b39b');
-      el.setAttribute('font-size', '11');
-      el.setAttribute('font-weight', '700');
-    } else if (seconds <= 10) {
-      el.textContent = `T-${seconds}`;
-      el.setAttribute('fill', '#db8355');
-      el.setAttribute('font-size', '11');
-      el.setAttribute('font-weight', '700');
-    } else {
-      el.textContent = `${seconds}s`;
-      el.setAttribute('fill', 'rgba(148, 163, 184, 0.6)');
-      el.setAttribute('font-size', '10');
-      el.setAttribute('font-weight', '400');
-    }
+  updateCountdown(text) {
+    this.setText('session-card-detail', text);
   }
 
   clamp(value, min, max) {

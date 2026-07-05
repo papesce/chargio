@@ -45,25 +45,26 @@ function secondsUntilNextPoll() {
   return (POLL_TARGET_SECOND - s + 60) % 60;
 }
 
+function formatCountdownText(seconds, isFirstReading) {
+  if (seconds === 0) {
+    return isFirstReading ? "Reading\u2026" : "Updating\u2026";
+  }
+  const display = seconds > 30 ? 60 : seconds > 10 ? 30 : seconds;
+  return isFirstReading ? `First reading in ${display}s` : `Next update in ${display}s`;
+}
+
 function updateCountdownText() {
   const el = $("timeFooter");
   if (!el) return;
 
   const secs = secondsUntilNextPoll();
   const isFirstReading = state.samples.length === 0;
+  const text = formatCountdownText(secs, isFirstReading);
 
-  if (secs === 0) {
-    el.textContent = isFirstReading ? "Reading…" : "Updating…";
-    el.className = "footer-updating";
-  } else if (isFirstReading) {
-    el.textContent = `First reading in ${secs}s`;
-    el.className = "footer-first";
-  } else {
-    el.textContent = `Next update in ${secs}s`;
-    el.className = "footer-quiet";
-  }
+  el.textContent = text;
+  el.className = secs === 0 ? "footer-updating" : isFirstReading ? "footer-first" : "footer-quiet";
 
-  state.powerFlowComponent?.updateCountdown(secs);
+  state.powerFlowComponent?.updateCountdown(text);
 }
 
 function localTime(iso) {
@@ -1515,12 +1516,6 @@ function resetAnimationIdleTimer() {
 }
 
 function updateRefreshIndicator() {
-  if (state.lastRefreshTime) {
-    const elapsed = Date.now() - state.lastRefreshTime;
-    const progress = Math.min(1, elapsed / 60000);
-    state.powerFlowComponent?.updateRefreshRing(progress);
-  }
-
   updateCountdownText();
   requestAnimationFrame(updateRefreshIndicator);
 }
