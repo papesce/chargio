@@ -34,6 +34,7 @@ class Collector(threading.Thread):
         self.active_polls_remaining = 0
         self.last_external_connected = None
         self.next_poll_in = interval
+        self.last_compression_time = time.time()
 
     def skip_reason(self, sample):
         percent = sample.get("percent")
@@ -62,7 +63,23 @@ class Collector(threading.Thread):
         }
 
     def run(self):
+        # Run initial compression on startup
+        try:
+            from compress_history import compress_history
+            compress_history(self.db_path)
+        except Exception as exc:
+            print(f"[SERVER] Failed to run initial history compression: {exc}", flush=True)
+
         while not self.stop_event.is_set():
+            # Run periodic compression every 24 hours
+            if time.time() - self.last_compression_time > 86400:
+                try:
+                    from compress_history import compress_history
+                    compress_history(self.db_path)
+                    self.last_compression_time = time.time()
+                except Exception as exc:
+                    print(f"[SERVER] Failed to run periodic history compression: {exc}", flush=True)
+
             try:
                 sample = collect_sample()
                 self.last_sample = sample

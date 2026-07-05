@@ -128,12 +128,19 @@ function estimateDischargeMinutes(sample, samples) {
   }
   if (!Array.isArray(samples) || samples.length < 2) return null;
 
-  const unplugged = samples.filter((item) => (
-    item
-    && !item.external_connected
-    && item.percent !== null
-    && item.percent !== undefined
-  ));
+  // Scan backwards from the latest sample to get the current continuous unplugged session
+  const unplugged = [];
+  for (let i = samples.length - 1; i >= 0; i--) {
+    const item = samples[i];
+    if (!item) continue;
+    if (item.external_connected) {
+      break; // Stop at the last time the laptop was plugged in
+    }
+    if (item.percent !== null && item.percent !== undefined) {
+      unplugged.unshift(item);
+    }
+  }
+
   if (unplugged.length < 2) return null;
 
   const first = unplugged[0];

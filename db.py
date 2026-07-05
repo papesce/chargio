@@ -31,6 +31,24 @@ CREATE TABLE IF NOT EXISTS battery_samples (
 
 CREATE INDEX IF NOT EXISTS idx_battery_samples_sampled_at
 ON battery_samples(sampled_at);
+
+CREATE TABLE IF NOT EXISTS session_summaries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_type TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  ended_at TEXT NOT NULL,
+  start_percent REAL,
+  end_percent REAL,
+  duration_minutes REAL,
+  avg_power_w REAL,
+  avg_temp_c REAL,
+  max_capacity INTEGER,
+  design_capacity INTEGER,
+  cycle_count INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_summaries_started_at
+ON session_summaries(started_at);
 """
 
 
