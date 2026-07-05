@@ -7,6 +7,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from datetime import datetime, timezone, timedelta
 
 from battery import collect_sample
 from db import history_samples, init_db, insert_sample, latest_sample
@@ -55,7 +56,6 @@ class Collector(threading.Thread):
 
     def run(self):
         while not self.stop_event.is_set():
-            started = time.time()
             try:
                 sample = collect_sample()
                 self.last_sample = sample
@@ -72,8 +72,12 @@ class Collector(threading.Thread):
             except Exception as exc:
                 self.last_error = str(exc)
 
-            elapsed = time.time() - started
-            self.stop_event.wait(max(0.5, self.interval - elapsed))
+            now = datetime.now(timezone.utc)
+            target = now.replace(second=1, microsecond=0)
+            if target <= now:
+                target += timedelta(minutes=1)
+            wait = max(0.5, (target - datetime.now(timezone.utc)).total_seconds())
+            self.stop_event.wait(wait)
 
     def stop(self):
         self.stop_event.set()

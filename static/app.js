@@ -761,6 +761,7 @@ function drawPowerChart(canvasId, points, adapterPoints) {
     ctx.fillStyle = mid >= 0 ? rgba(chargeRgb, 0.2) : rgba(dischargeRgb, 0.22);
     ctx.beginPath();
     ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y0);
     ctx.lineTo(x1, y1);
     ctx.lineTo(x1, zeroY);
     ctx.lineTo(x0, zeroY);
@@ -797,6 +798,7 @@ function drawPowerChart(canvasId, points, adapterPoints) {
     ctx.strokeStyle = stroke;
     ctx.beginPath();
     ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y0);
     ctx.lineTo(x1, y1);
     ctx.stroke();
   }
@@ -820,6 +822,7 @@ function drawPowerChart(canvasId, points, adapterPoints) {
       const y1 = yToPy(p1.y);
       ctx.beginPath();
       ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y0);
       ctx.lineTo(x1, y1);
       ctx.stroke();
     }

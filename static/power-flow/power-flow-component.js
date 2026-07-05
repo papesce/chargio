@@ -157,6 +157,7 @@ class PowerFlowComponent {
       .label-muted { fill: rgba(148, 163, 184, 0.9); font-size: 12px; font-weight: 500; letter-spacing: 0; }
       .metric-value { fill: #f8fafc; font-size: 17px; font-weight: 800; letter-spacing: 0; }
       .metric-label { fill: rgba(203, 213, 225, 0.78); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+      #session-card .metric-label { text-transform: none; }
       .battery-percent { fill: #f8fafc; font-size: 48px; font-weight: 850; letter-spacing: 0; }
       .line-current-bg { fill: rgba(15, 23, 42, 0.78); stroke: rgba(255, 255, 255, 0.16); stroke-width: 1; }
       .line-current-label { fill: #f8fafc; font-size: 12px; font-weight: 800; letter-spacing: 0; }
@@ -428,7 +429,7 @@ class PowerFlowComponent {
     }
 
     this.setAttr('#battery-flow-card-accent', 'fill', this.getBatteryFlowColor());
-    this.setAttr('#session-card-accent', 'fill', isPluggedIn ? '#4ade80' : '#facc15');
+    this.setAttr('#session-card-accent', 'fill', isCharging ? '#4ade80' : (isDischarging ? '#facc15' : '#94a3b8'));
     this.setAttr('#laptop-status-dot', 'fill', isPluggedIn ? 'rgba(88, 166, 255, 0.18)' : 'rgba(250, 204, 21, 0.18)');
 
     const adapterAmps = this.getChargerToLaptopCurrentMa();
@@ -670,10 +671,6 @@ class PowerFlowComponent {
 
   getSessionValue() {
     return this.formatMinutes(this.state.timeRemainingMin);
-  }
-
-  getSessionDetail() {
-    return `Sampled ${this.formatSampleTime(this.state.sampledAt)}`;
   }
 
   getBatteryFlowColor() {
