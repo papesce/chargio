@@ -18,7 +18,9 @@ Historical charts show power direction, temperature, and charge percentage over 
 - Full-screen live energy-flow visualization for charger, laptop, and battery state.
 - Battery Saver UI mode for static, lower-energy graphics.
 - Detailed dashboard with current metrics, charging diagnosis, and historical charts.
-- Near-real-time sampling from `ioreg -r -c AppleSmartBattery`.
+- Near-real-time sampling using native `ctypes` bindings to macOS `IOKit`/`CoreFoundation` (with fallback to `ioreg`).
+- Instant power event callbacks using macOS power status notifications, triggering immediate UI updates.
+- Real-time updates pushed from the server using Server-Sent Events (SSE).
 - SQLite history stored locally in `battery.sqlite3`.
 - Optional recording filters for battery percentage and absolute power.
 - No external Python dependencies.
@@ -155,6 +157,7 @@ The app serves a few JSON endpoints:
 - `GET /api/current`: latest live sample plus collector status.
 - `GET /api/history?seconds=3600`: historical samples for the requested range, clamped between 60 seconds and 7 days.
 - `GET /api/collect-now`: collect and store one immediate sample.
+- `GET /api/events`: Server-Sent Events (SSE) stream pushing updates to clients in real-time as samples are recorded.
 
 ## Project Layout
 
