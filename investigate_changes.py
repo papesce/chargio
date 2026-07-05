@@ -12,6 +12,7 @@ def main():
     total_samples = 0
     changes_detected = 0
     secs_since_change = 0
+    last_change_time = None
 
     print("sampled_at, changed_fields")
     start = time.time()
@@ -22,7 +23,7 @@ def main():
         now = sample["sampled_at"]
 
         elapsed = time.time() - start
-        print(f"[{elapsed:5.1f}s] (no-chg: {secs_since_change}s) ", end="")
+        status = f"\r[{elapsed:5.1f}s] (no-chg: {secs_since_change}s) "
 
         changed = []
         if prev is not None:
@@ -34,19 +35,23 @@ def main():
                     changed.append(key)
                     change_counts[key] = change_counts.get(key, 0) + 1
             if changed:
+                now_t = time.time()
+                elapsed_since = now_t - (last_change_time if last_change_time is not None else start)
+                last_change_time = now_t
                 changes_detected += 1
                 secs_since_change = 0
-                print(f"{now}, {', '.join(sorted(changed))}")
+                print(f"{datetime.now().strftime('%H:%M:%S')}, elapsed {elapsed_since:.1f}s, {', '.join(sorted(changed))}")
             else:
                 secs_since_change += 1
-                print(f"{now}, (no change)")
+                print(status, end="")
         else:
-            print(f"{now}, (first sample - baseline)")
+            print(status + f"{now}, (first sample - baseline)")
 
         prev = sample
         remaining = max(0, 1.0 - (time.time() - (start + int(elapsed))))
         while remaining > 0:
-            print(f"\r  waiting... {remaining:4.1f}s ", end="", flush=True)
+            now_wall = datetime.now().strftime("%H:%M:%S")
+            print(f"\r  waiting for changes ({now_wall}) elapsed {int(elapsed)}s ", end="", flush=True)
             tick = min(remaining, 1.0)
             time.sleep(tick)
             remaining = max(0, 1.0 - (time.time() - (start + int(elapsed))))

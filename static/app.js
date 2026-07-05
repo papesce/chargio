@@ -18,6 +18,8 @@ const state = {
   isPluggedIn: false,
   lastRefreshTime: 0,
   chartHover: { canvasId: null, pointIndex: -1, point: null },
+  nextPollIn: 60,
+  lastSampleReceivedTime: Date.now(),
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -41,13 +43,17 @@ function fmtInt(value, suffix = "") {
 }
 
 function secondsUntilNextPoll() {
+  if (state.lastSampleReceivedTime) {
+    const elapsed = (Date.now() - state.lastSampleReceivedTime) / 1000;
+    return Math.max(0, Math.round(state.nextPollIn - elapsed));
+  }
   const s = new Date().getSeconds();
   return (POLL_TARGET_SECOND - s + 60) % 60;
 }
 
 function formatCountdownText(seconds, isFirstReading) {
-  if (seconds === 0) {
-    return isFirstReading ? "Reading\u2026" : "Updating\u2026";
+  if (seconds <= 3) {
+    return isFirstReading ? "Reading…" : "Updating…";
   }
   const display = seconds > 30 ? 60 : seconds > 10 ? 30 : seconds;
   return isFirstReading ? `First reading in ${display}s` : `Next update in ${display}s`;
@@ -62,7 +68,7 @@ function updateCountdownText() {
   const text = formatCountdownText(secs, isFirstReading);
 
   el.textContent = text;
-  el.className = secs === 0 ? "footer-updating" : isFirstReading ? "footer-first" : "footer-quiet";
+  el.className = secs <= 3 ? "footer-updating" : isFirstReading ? "footer-first" : "footer-quiet";
 
   state.powerFlowComponent?.updateCountdown(text);
 }
@@ -299,10 +305,10 @@ function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   if (!sample.external_connected) {
     const estimate = unpluggedEstimate ?? sample.time_remaining_min;
     const label = minutesLabel(estimate);
-    $("remaining").textContent = label === "--" ? "Calculating…" : label;
+    $("remaining").textContent = label === "--" ? "…" : label;
   } else {
     const label = minutesLabel(sample.time_remaining_min);
-    $("remaining").textContent = label === "--" ? "Calculating…" : label;
+    $("remaining").textContent = label === "--" ? "…" : label;
   }
   const filters = activeFilters(collectorStatus?.filters);
   const recordingText = collectorStatus?.last_skip_reason
@@ -1329,7 +1335,10 @@ function updateCharts() {
   }
 }
 
+let refreshing = false;
 async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
   try {
     const [current, history] = await Promise.all([
       fetchJson("/api/current"),
@@ -1337,11 +1346,17 @@ async function refresh() {
     ]);
     state.samples = history.samples || [];
     state.collectorStatus = current.collector_status ?? null;
+    state.lastSampleReceivedTime = Date.now();
+    if (state.collectorStatus && state.collectorStatus.next_poll_in !== undefined) {
+      state.nextPollIn = state.collectorStatus.next_poll_in;
+    }
     updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples);
     scheduleChartRedraw();
     state.lastRefreshTime = Date.now();
   } catch (error) {
     $("subtitle").textContent = error.message;
+  } finally {
+    refreshing = false;
   }
 }
 
@@ -1620,8 +1635,57 @@ updateIdleProgressBar();
 updateRefreshIndicator();
 setView("live", "auto");
 
+let eventSource = null;
+
+function connectEvents() {
+  if (eventSource) {
+    try {
+      eventSource.close();
+    } catch (e) {}
+  }
+
+  eventSource = new EventSource("/api/events");
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      const sample = data.sample;
+      const collectorStatus = data.collector_status ?? null;
+      
+      if (sample) {
+        const oldConnected = state.isPluggedIn;
+        const newConnected = sample.external_connected === 1 || sample.external_connected === true;
+        
+        state.collectorStatus = collectorStatus;
+        state.lastSampleReceivedTime = Date.now();
+        if (collectorStatus && collectorStatus.next_poll_in !== undefined) {
+          state.nextPollIn = collectorStatus.next_poll_in;
+        }
+        
+        // Immediately update current metrics and animation states in the UI
+        updateCurrent(sample, null, collectorStatus, state.samples);
+        
+        const isFirst = state.samples.length === 0;
+        if (!isFirst && oldConnected !== newConnected) {
+          // Trigger background history and chart refresh
+          refresh();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse event data", e);
+    }
+  };
+
+  eventSource.onerror = (err) => {
+    console.warn("EventSource disconnected, retrying in 3s...", err);
+    eventSource.close();
+    setTimeout(connectEvents, 3000);
+  };
+}
+
 function startCountdownCycle() {
   refresh();
+  connectEvents();
   countdownIntervalId = setInterval(() => {
     if (secondsUntilNextPoll() === 0) {
       refresh();
@@ -1633,4 +1697,5 @@ startCountdownCycle();
 
 window.addEventListener("beforeunload", () => {
   if (countdownIntervalId) clearInterval(countdownIntervalId);
+  if (eventSource) eventSource.close();
 });
