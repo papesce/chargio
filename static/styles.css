@@ -138,6 +138,22 @@ h2 {
   font-size: 14px;
 }
 
+.refresh-ring {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.refresh-ring-bg {
+  stroke: var(--muted);
+  opacity: 0.3;
+}
+
+.refresh-ring-fg {
+  stroke: var(--adapter);
+  transition: stroke-dashoffset 0.2s linear;
+}
+
 .controls {
   display: flex;
   gap: 6px;

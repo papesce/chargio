@@ -77,7 +77,13 @@
               <article class="metric" title="Estimated remaining run time and last sample time">
                 <span title="Time remaining or elapsed">Time</span>
                 <strong id="remaining">--</strong>
-                <small id="sampled" title="Timestamp of the most recent sample">--</small>
+                <small id="sampled" title="Timestamp of the most recent sample">
+                  <svg class="refresh-ring" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                    <circle cx="7" cy="7" r="5" fill="none" stroke-width="2" stroke-linecap="round" class="refresh-ring-bg"/>
+                    <circle cx="7" cy="7" r="5" fill="none" stroke-width="2" stroke-linecap="round" class="refresh-ring-fg" id="refreshRingFg" stroke-dasharray="31.416" stroke-dashoffset="0" transform="rotate(-90 7 7)"/>
+                  </svg>
+                  <span id="sampledText">--</span>
+                </small>
               </article>
             </section>
 

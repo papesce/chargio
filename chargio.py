@@ -21,7 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description="Local macOS battery monitor")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=7943)
-    parser.add_argument("--interval", type=float, default=5.0)
+    parser.add_argument("--interval", type=float, default=60.0)
     parser.add_argument("--db", type=Path, default=DB_PATH)
     parser.add_argument("--record-min-percent", type=float, help="only store samples at or above this battery percent")
     parser.add_argument("--record-max-percent", type=float, help="only store samples at or below this battery percent")

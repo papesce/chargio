@@ -66,6 +66,7 @@ class PowerFlowComponent {
       'charger-to-laptop-flow': q('#charger-to-laptop-flow'),
       'battery-to-laptop-flow': q('#battery-to-laptop-flow'),
       'laptop-to-battery-flow': q('#laptop-to-battery-flow'),
+      'session-card-ring-fg': q('#session-card-ring-fg'),
     };
   }
 
@@ -302,6 +303,29 @@ class PowerFlowComponent {
     group.appendChild(this.metricCard(256, 446, 190, 'Battery Flow', this.getBatteryFlowValue(), this.getBatteryFlowDetail(), this.getBatteryFlowColor(), 'battery-flow-card'));
     group.appendChild(this.metricCard(466, 446, 190, 'Battery Health', this.getBatteryHealthValue(), this.getBatteryHealthDetail(), '#4ade80', 'battery-health-card'));
     group.appendChild(this.metricCard(676, 446, 178, 'Remaining', this.getSessionValue(), this.getSessionDetail(), '#facc15', 'session-card'));
+
+    const sessionCard = group.lastElementChild;
+    const ringX = 708, ringY = 514;
+    const ringGroup = this.el('g', { id: 'session-refresh-ring' });
+    ringGroup.appendChild(this.el('circle', {
+      cx: ringX, cy: ringY, r: '5',
+      fill: 'none', 'stroke-width': '2', 'stroke-linecap': 'round',
+      stroke: 'rgba(148, 163, 184, 0.3)'
+    }));
+    ringGroup.appendChild(this.el('circle', {
+      cx: ringX, cy: ringY, r: '5',
+      fill: 'none', 'stroke-width': '2', 'stroke-linecap': 'round',
+      stroke: '#58a6ff',
+      'stroke-dasharray': '31.416',
+      'stroke-dashoffset': '0',
+      'id': 'session-card-ring-fg',
+      transform: `rotate(-90 ${ringX} ${ringY})`,
+      style: 'transition: stroke-dashoffset 0.2s linear'
+    }));
+    sessionCard.appendChild(ringGroup);
+    const detailEl = sessionCard.querySelector('#session-card-detail');
+    if (detailEl) detailEl.setAttribute('x', '720');
+
     svg.appendChild(group);
   }
 
@@ -790,6 +814,13 @@ class PowerFlowComponent {
       element.setAttribute(key, value);
     });
     return element;
+  }
+
+  updateRefreshRing(progress) {
+    const ring = this._els?.['session-card-ring-fg'];
+    if (!ring) return;
+    const circumference = 31.416;
+    ring.setAttribute('stroke-dashoffset', String(circumference * progress));
   }
 
   clamp(value, min, max) {

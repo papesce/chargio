@@ -16,6 +16,7 @@ const state = {
   windowFocused: true,
   isMouseOver: false,
   isPluggedIn: false,
+  lastRefreshTime: 0,
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -23,6 +24,7 @@ const BATTERY_SAVER_STORAGE_KEY = "chargio.batterySaver";
 const IDLE_TIMEOUT_CHARGING_MS = 60000;
 const IDLE_TIMEOUT_BATTERY_MS = 20000;
 const IDLE_TIMEOUT_OBSERVATION_MS = 120000;
+const REFRESH_INTERVAL_MS = 30000;
 
 const $ = (id) => document.getElementById(id);
 
@@ -271,7 +273,7 @@ function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   } else {
     $("remaining").textContent = minutesLabel(sample.time_remaining_min);
   }
-  $("sampled").textContent = `sampled ${localTime(sample.sampled_at)}`;
+  $("sampledText").textContent = `sampled ${localTime(sample.sampled_at)}`;
   const filters = activeFilters(collectorStatus?.filters);
   const recordingText = collectorStatus?.last_skip_reason
     ? `live ${localTime(sample.sampled_at)}; not recording, ${collectorStatus.last_skip_reason}`
@@ -666,7 +668,7 @@ function drawPowerChart(canvasId, points, adapterPoints) {
       const p0 = adapterPoints[i];
       const p1 = adapterPoints[i + 1];
       const gap = p1.x.getTime() - p0.x.getTime();
-      if (gap > 30000) {
+      if (gap > 300000) {
         drawing = false;
         continue;
       }
@@ -1092,12 +1094,21 @@ function closeChartFocus() {
 }
 
 function adapterPowerSeries(samples) {
-  return samples
-    .filter((s) => s.system_power_w != null && s.system_power_w > 0 && s.external_connected)
-    .map((s) => ({
-      x: new Date(s.sampled_at),
-      y: s.system_power_w,
-    }));
+  const result = [];
+  let lastValid = null;
+  for (const s of samples) {
+    const connected = s.external_connected === 1 || s.external_connected === true;
+    const hasPower = s.system_power_w != null && s.system_power_w > 0;
+    if (connected && hasPower) {
+      lastValid = s.system_power_w;
+      result.push({ x: new Date(s.sampled_at), y: s.system_power_w });
+    } else if (connected && lastValid !== null) {
+      result.push({ x: new Date(s.sampled_at), y: lastValid });
+    } else if (!connected) {
+      lastValid = null;
+    }
+  }
+  return result;
 }
 
 let _chartRedrawScheduled = false;
@@ -1177,6 +1188,7 @@ async function refresh() {
     state.collectorStatus = current.collector_status ?? null;
     updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples);
     scheduleChartRedraw();
+    state.lastRefreshTime = Date.now();
   } catch (error) {
     $("subtitle").textContent = error.message;
   }
@@ -1355,6 +1367,27 @@ function resetAnimationIdleTimer() {
   }, state.idleTimeoutMs);
 }
 
+function updateRefreshIndicator() {
+  const ring = $("refreshRingFg");
+  if (!ring) { requestAnimationFrame(updateRefreshIndicator); return; }
+
+  if (!state.lastRefreshTime) {
+    ring.setAttribute("stroke-dashoffset", "0");
+    requestAnimationFrame(updateRefreshIndicator);
+    return;
+  }
+
+  const elapsed = Date.now() - state.lastRefreshTime;
+  const progress = Math.min(1, elapsed / REFRESH_INTERVAL_MS);
+  const circumference = 31.416;
+  const offset = circumference * progress;
+  ring.setAttribute("stroke-dashoffset", String(offset));
+
+  state.powerFlowComponent?.updateRefreshRing(progress);
+
+  requestAnimationFrame(updateRefreshIndicator);
+}
+
 function updateIdleProgressBar() {
   const bar = $("idleProgress");
   if (!bar) return;
@@ -1411,6 +1444,7 @@ document.addEventListener("visibilitychange", () => {
 
 resetAnimationIdleTimer();
 updateIdleProgressBar();
+updateRefreshIndicator();
 refresh();
 setView("live", "auto");
-setInterval(refresh, 5000);
+setInterval(refresh, REFRESH_INTERVAL_MS);
