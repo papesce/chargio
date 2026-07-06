@@ -29,6 +29,8 @@ class PowerFlowComponent {
       temperatureC: null,
       cycleCount: null,
       timeRemainingMin: null,
+      batteryElapsedMin: null,
+      connectedElapsedMin: null,
       sampledAt: null,
       ...initialState
     };
@@ -157,7 +159,7 @@ class PowerFlowComponent {
       .label-muted { fill: rgba(148, 163, 184, 0.9); font-size: 12px; font-weight: 500; letter-spacing: 0; }
       .metric-value { fill: #f8fafc; font-size: 17px; font-weight: 800; letter-spacing: 0; }
       .metric-label { fill: rgba(203, 213, 225, 0.78); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-      #session-card .metric-label { text-transform: none; }
+      #session-card .metric-label { text-transform: uppercase; }
       .battery-percent { fill: #f8fafc; font-size: 48px; font-weight: 850; letter-spacing: 0; }
       .line-current-bg { fill: rgba(15, 23, 42, 0.78); stroke: rgba(255, 255, 255, 0.16); stroke-width: 1; }
       .line-current-label { fill: #f8fafc; font-size: 12px; font-weight: 800; letter-spacing: 0; }
@@ -303,7 +305,7 @@ class PowerFlowComponent {
     group.appendChild(this.metricCard(46, 446, 190, 'Power Source', this.getSourceCardValue(), this.getSourceCardDetail(), '#58a6ff', 'source-card'));
     group.appendChild(this.metricCard(256, 446, 190, 'Battery Flow', this.getBatteryFlowValue(), this.getBatteryFlowDetail(), this.getBatteryFlowColor(), 'battery-flow-card'));
     group.appendChild(this.metricCard(466, 446, 190, 'Battery Health', this.getBatteryHealthValue(), this.getBatteryHealthDetail(), '#4ade80', 'battery-health-card'));
-    group.appendChild(this.metricCard(676, 446, 178, this.getSessionLabel(), this.getSessionValue(), '', '#facc15', 'session-card'));
+    group.appendChild(this.metricCard(676, 446, 178, this.getSessionLabel(), this.getSessionValue(), this.getSessionDetail(), '#facc15', 'session-card'));
 
     svg.appendChild(group);
   }
@@ -320,7 +322,7 @@ class PowerFlowComponent {
     const group = this.el('g', { class: 'card-shadow', id: idPrefix });
     group.appendChild(this.el('rect', { x, y, width, height: '82', rx: '18', class: 'glass-card' }));
     group.appendChild(this.el('rect', { x: x + 14, y: y + 15, width: '4', height: '52', rx: '2', fill: accent, id: `${idPrefix}-accent` }));
-    group.appendChild(this.text(label, x + 28, y + 29, 'metric-label'));
+    group.appendChild(this.text(label, x + 28, y + 29, 'metric-label', { id: `${idPrefix}-label` }));
     group.appendChild(this.text(value, x + 28, y + 53, 'metric-value', { id: `${idPrefix}-value` }));
     group.appendChild(this.text(detail, x + 28, y + 72, 'label-muted', { id: `${idPrefix}-detail` }));
     
@@ -387,7 +389,9 @@ class PowerFlowComponent {
     this.setText('battery-health-card-value', this.getBatteryHealthValue());
     this.setText('battery-health-card-detail', this.getBatteryHealthDetail());
     this.setText('battery-health-card-tooltip', this.getBatteryHealthTooltip());
+    this.setText('session-card-label', this.getSessionLabel());
     this.setText('session-card-value', this.getSessionValue());
+    this.setText('session-card-detail', this.getSessionDetail());
 
     const isPluggedIn = !!this.state.isPluggedIn;
     const isCharging = isPluggedIn && (this.state.isCharging || amps > 0);
@@ -673,6 +677,15 @@ class PowerFlowComponent {
     return this.formatMinutes(this.state.timeRemainingMin);
   }
 
+  getSessionDetail() {
+    if (this.state.isPluggedIn) {
+      if (this.state.connectedElapsedMin === null || this.state.connectedElapsedMin === undefined) return '';
+      return `Connected ${this.formatMinutes(this.state.connectedElapsedMin)}`;
+    }
+    if (this.state.batteryElapsedMin === null || this.state.batteryElapsedMin === undefined) return '';
+    return `On battery ${this.formatMinutes(this.state.batteryElapsedMin)}`;
+  }
+
   getBatteryFlowColor() {
     const current = Number(this.state.amperageMa);
     if (Number.isNaN(current) || current === 0) return '#94a3b8';
@@ -743,7 +756,7 @@ class PowerFlowComponent {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (!hours) return `${mins}m`;
-    return `${hours}h ${mins}m`;
+    return mins ? `${hours}h ${mins}m` : `${hours}h`;
   }
 
   formatSampleTime(value) {
@@ -795,8 +808,7 @@ class PowerFlowComponent {
     return element;
   }
 
-  updateCountdown(text) {
-    this.setText('session-card-detail', text);
+  updateCountdown(_text) {
   }
 
   clamp(value, min, max) {

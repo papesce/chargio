@@ -7,6 +7,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+DEBUG = False
 from datetime import datetime, timezone, timedelta
 import ctypes
 import ctypes.util
@@ -173,21 +175,27 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_header("Connection", "keep-alive")
             self.end_headers()
 
-            last_timestamp = None
+            COMPARE_FIELDS = [
+                "percent", "amperage_ma", "power_w", "voltage_mv",
+                "is_charging", "external_connected", "fully_charged",
+                "temperature_c", "adapter_watts", "time_remaining_min",
+                "current_capacity", "max_capacity",
+            ]
+            last_fingerprint = None
             while self.collector and not self.collector.stop_event.is_set():
                 sample = self.collector.last_sample
                 if sample:
-                    ts = sample.get("sampled_at")
-                    if ts != last_timestamp:
+                    fingerprint = tuple(sample.get(f) for f in COMPARE_FIELDS)
+                    if fingerprint != last_fingerprint:
                         payload = json.dumps({
                             "sample": sample,
                             "collector_status": self.collector.status()
                         })
                         try:
-                            print(f"[SERVER] SSE sending sample: {ts}", flush=True)
+                            print(f"[SERVER] SSE sending sample: {sample.get('sampled_at')}", flush=True)
                             self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
                             self.wfile.flush()
-                            last_timestamp = ts
+                            last_fingerprint = fingerprint
                         except (ConnectionResetError, BrokenPipeError):
                             break
                 time.sleep(0.1)
@@ -195,18 +203,28 @@ class AppHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/current":
             live_sample = self.collector.last_sample if self.collector else None
-            self.send_json({
-                "sample": live_sample or latest_sample(self.db_path),
+            sample = live_sample or latest_sample(self.db_path)
+            payload = {
+                "sample": sample,
                 "collector_error": self.collector.last_error if self.collector else None,
                 "collector_status": self.collector.status() if self.collector else None,
-            }, head_only=head_only)
+            }
+            if DEBUG:
+                payload["_server_time"] = time.time()
+                payload["_data_hash"] = hash(json.dumps(sample, sort_keys=True, default=str)) if sample else None
+            self.send_json(payload, head_only=head_only)
             return
 
         if parsed.path == "/api/history":
             params = parse_qs(parsed.query)
             seconds = int(params.get("seconds", ["3600"])[0])
             seconds = max(60, min(seconds, 7 * 24 * 3600))
-            self.send_json({"samples": history_samples(self.db_path, seconds)}, head_only=head_only)
+            samples = history_samples(self.db_path, seconds)
+            payload = {"samples": samples}
+            if DEBUG:
+                payload["_server_time"] = time.time()
+                payload["_sample_count"] = len(samples)
+            self.send_json(payload, head_only=head_only)
             return
 
         if parsed.path == "/api/collect-now":

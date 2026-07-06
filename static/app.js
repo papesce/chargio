@@ -20,6 +20,8 @@ const state = {
   chartHover: { canvasId: null, pointIndex: -1, point: null },
   nextPollIn: 60,
   lastSampleReceivedTime: Date.now(),
+  subtitleBase: null,
+  lastSampleTimestamp: null,
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -27,8 +29,7 @@ const BATTERY_SAVER_STORAGE_KEY = "chargio.batterySaver";
 const IDLE_TIMEOUT_CHARGING_MS = 60000;
 const IDLE_TIMEOUT_BATTERY_MS = 20000;
 const IDLE_TIMEOUT_OBSERVATION_MS = 120000;
-const POLL_TARGET_SECOND = 2; // Poll at :02 of each minute (1s after backend samples at :01)
-let countdownIntervalId = null;
+const DEBUG = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,15 +43,6 @@ function fmtInt(value, suffix = "") {
   return `${Math.round(Number(value))}${suffix}`;
 }
 
-function secondsUntilNextPoll() {
-  if (state.lastSampleReceivedTime) {
-    const elapsed = (Date.now() - state.lastSampleReceivedTime) / 1000;
-    return Math.max(0, Math.round(state.nextPollIn - elapsed));
-  }
-  const s = new Date().getSeconds();
-  return (POLL_TARGET_SECOND - s + 60) % 60;
-}
-
 function formatCountdownText(seconds, isFirstReading) {
   if (seconds <= 3) {
     return isFirstReading ? "Reading…" : "Updating…";
@@ -62,15 +54,8 @@ function formatCountdownText(seconds, isFirstReading) {
 function updateCountdownText() {
   const el = $("timeFooter");
   if (!el) return;
-
-  const secs = secondsUntilNextPoll();
-  const isFirstReading = state.samples.length === 0;
-  const text = formatCountdownText(secs, isFirstReading);
-
-  el.textContent = text;
-  el.className = secs <= 3 ? "footer-updating" : isFirstReading ? "footer-first" : "footer-quiet";
-
-  state.powerFlowComponent?.updateCountdown(text);
+  el.textContent = "";
+  el.className = "";
 }
 
 function localTime(iso) {
@@ -78,12 +63,20 @@ function localTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+function updateSubtitleAgo() {
+  if (!state.subtitleBase || !state.lastSampleTimestamp) return;
+  const elapsed = Date.now() - new Date(state.lastSampleTimestamp).getTime();
+  if (!Number.isFinite(elapsed) || elapsed < 0) return;
+  const ago = elapsed < 2000 ? 'now' : `${formatGapMs(elapsed)} ago`;
+  $("subtitle").textContent = `${state.subtitleBase} — ${ago}`;
+}
+
 function minutesLabel(minutes) {
   if (!minutes || minutes === 65535) return "--";
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   if (hours <= 0) return `${mins}m`;
-  return `${hours}h ${mins}m`;
+  return mins ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
 function formatDurationMs(ms) {
@@ -122,20 +115,17 @@ function maxSampleGapMs(samples) {
   return maxGap;
 }
 
-function estimateDischargeMinutes(sample, samples) {
+function getUnpluggedStats(sample, samples) {
   if (!sample || sample.external_connected || sample.percent === null || sample.percent === undefined) {
     return null;
   }
   if (!Array.isArray(samples) || samples.length < 2) return null;
 
-  // Scan backwards from the latest sample to get the current continuous unplugged session
   const unplugged = [];
   for (let i = samples.length - 1; i >= 0; i--) {
     const item = samples[i];
     if (!item) continue;
-    if (item.external_connected) {
-      break; // Stop at the last time the laptop was plugged in
-    }
+    if (item.external_connected) break;
     if (item.percent !== null && item.percent !== undefined) {
       unplugged.unshift(item);
     }
@@ -156,7 +146,41 @@ function estimateDischargeMinutes(sample, samples) {
   const dropPerMinute = percentDrop / elapsedMinutes;
   if (!Number.isFinite(dropPerMinute) || dropPerMinute <= 0) return null;
 
-  return Math.round(Number(sample.percent) / dropPerMinute);
+  return {
+    elapsedMinutes: Math.round(elapsedMinutes),
+    remainingMinutes: Math.round(Number(sample.percent) / dropPerMinute),
+  };
+}
+
+function getConnectedStats(sample, samples) {
+  if (!sample || !sample.external_connected) return null;
+  if (!Array.isArray(samples) || samples.length < 1) return null;
+
+  const endMs = new Date(sample.sampled_at).getTime();
+  if (!Number.isFinite(endMs)) return null;
+
+  let startSample = null;
+  for (let i = samples.length - 1; i >= 0; i--) {
+    const item = samples[i];
+    if (!item) continue;
+    if (!item.external_connected) break;
+    startSample = item;
+  }
+
+  if (!startSample) return null;
+
+  const startMs = new Date(startSample.sampled_at).getTime();
+  if (!Number.isFinite(startMs)) return null;
+
+  const elapsedMinutes = (endMs - startMs) / 60000;
+  if (!Number.isFinite(elapsedMinutes) || elapsedMinutes <= 0) return null;
+
+  return { elapsedMinutes: Math.round(elapsedMinutes) };
+}
+
+function estimateDischargeMinutes(sample, samples) {
+  const stats = getUnpluggedStats(sample, samples);
+  return stats?.remainingMinutes ?? null;
 }
 
 async function fetchJson(url) {
@@ -250,11 +274,14 @@ function updatePowerFlow(sample, samples) {
     intensity = Math.min(Math.abs(sample.power_w) / 50, 2.0);
   }
 
-  const unpluggedEstimate = estimateDischargeMinutes(sample, samples);
+  const unpluggedStats = getUnpluggedStats(sample, samples);
+  const unpluggedEstimate = unpluggedStats?.remainingMinutes ?? null;
   let bestTimeEstimate = sample.time_remaining_min;
   if (!sample.external_connected && unpluggedEstimate !== null) {
     bestTimeEstimate = unpluggedEstimate;
   }
+
+  const connectedStats = getConnectedStats(sample, samples);
 
   const nextFlowState = {
     isPluggedIn: sample.external_connected === 1 || sample.external_connected === true,
@@ -274,6 +301,8 @@ function updatePowerFlow(sample, samples) {
     temperatureC: sample.temperature_c,
     cycleCount: sample.cycle_count,
     timeRemainingMin: bestTimeEstimate,
+    batteryElapsedMin: unpluggedStats?.elapsedMinutes ?? null,
+    connectedElapsedMin: connectedStats?.elapsedMinutes ?? null,
     sampledAt: sample.sampled_at,
   };
 
@@ -308,21 +337,36 @@ function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   $("temperature").textContent = fmt(sample.temperature_c, " C", 1);
   $("cycles").textContent = `${fmtInt(sample.cycle_count)} cycles`;
   $("timeLabel").textContent = sample.external_connected ? "Time to full" : "Time remaining";
-  const unpluggedEstimate = estimateDischargeMinutes(sample, samples);
+  const unpluggedStats = getUnpluggedStats(sample, samples);
+  const unpluggedEstimate = unpluggedStats?.remainingMinutes ?? null;
   if (!sample.external_connected) {
     const estimate = unpluggedEstimate ?? sample.time_remaining_min;
     const label = minutesLabel(estimate);
     $("remaining").textContent = label === "--" ? "…" : label;
+    const elapsedLabel = unpluggedStats ? formatDurationMs(unpluggedStats.elapsedMinutes * 60000) : "";
+    $("batteryRunningTime").textContent = elapsedLabel ? `On battery ${elapsedLabel}` : "";
+    $("batteryRunningTime").style.display = elapsedLabel ? "" : "none";
   } else {
     const label = minutesLabel(sample.time_remaining_min);
     $("remaining").textContent = label === "--" ? "…" : label;
+    const connectedStats = getConnectedStats(sample, samples);
+    const connectedLabel = connectedStats ? formatDurationMs(connectedStats.elapsedMinutes * 60000) : "";
+    $("batteryRunningTime").textContent = connectedLabel ? `Connected ${connectedLabel}` : "";
+    $("batteryRunningTime").style.display = connectedLabel ? "" : "none";
   }
   const filters = activeFilters(collectorStatus?.filters);
   const recordingText = collectorStatus?.last_skip_reason
     ? `live ${localTime(sample.sampled_at)}; not recording, ${collectorStatus.last_skip_reason}`
     : `live ${localTime(sample.sampled_at)}; recording`;
   const filterText = filters.length ? ` (${filters.join(", ")})` : "";
-  $("subtitle").textContent = collectorError || `${recordingText}${filterText}`;
+  if (!collectorError) {
+    state.subtitleBase = `${recordingText}${filterText}`;
+    state.lastSampleTimestamp = sample.sampled_at;
+    updateSubtitleAgo();
+  } else {
+    state.subtitleBase = null;
+    $("subtitle").textContent = collectorError;
+  }
   updateDiagnosis(sample);
 }
 
@@ -1316,6 +1360,8 @@ function updateCharts() {
         intensity = Math.min(Math.abs(last.power_w) / 50, 2.0);
       }
 
+      const focusConnectedStats = getConnectedStats(last, state.samples);
+
       state.focusFlowComponent.setState({
         isPluggedIn: last.external_connected === 1 || last.external_connected === true,
         batteryLevel: Math.round(last.percent ?? 50),
@@ -1334,6 +1380,7 @@ function updateCharts() {
         temperatureC: last.temperature_c,
         cycleCount: last.cycle_count,
         timeRemainingMin: bestTimeEstimate,
+        connectedElapsedMin: focusConnectedStats?.elapsedMinutes ?? null,
         sampledAt: last.sampled_at,
       });
       state.focusFlowComponent.setLowPowerMode(!last.external_connected || state.batterySaver || state.reducedMotion);
@@ -1342,8 +1389,14 @@ function updateCharts() {
   }
 }
 
+let refreshCallId = 0;
 let refreshing = false;
-async function refresh() {
+async function refresh(trigger = "unknown") {
+  let callId = 0;
+  if (DEBUG) {
+    callId = ++refreshCallId;
+    console.log(`[REFRESH #${callId}] trigger=${trigger} refreshing=${refreshing} time=${Date.now()}`);
+  }
   if (refreshing) return;
   refreshing = true;
   try {
@@ -1360,8 +1413,15 @@ async function refresh() {
     updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples);
     scheduleChartRedraw();
     state.lastRefreshTime = Date.now();
+    if (DEBUG) {
+      console.log(`[REFRESH #${callId}] COMPLETE data_hash=${current._data_hash} server_time=${current._server_time} history_count=${state.samples.length}`);
+    }
   } catch (error) {
     $("subtitle").textContent = error.message;
+    state.subtitleBase = null;
+    if (DEBUG) {
+      console.log(`[REFRESH #${callId}] ERROR ${error.message}`);
+    }
   } finally {
     refreshing = false;
   }
@@ -1372,7 +1432,7 @@ document.querySelectorAll(".range").forEach((button) => {
     document.querySelectorAll(".range").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     state.seconds = Number(button.dataset.seconds);
-    refresh();
+    refresh("range-click");
   });
 });
 
@@ -1671,11 +1731,31 @@ function connectEvents() {
         
         // Immediately update current metrics and animation states in the UI
         updateCurrent(sample, null, collectorStatus, state.samples);
-        
+
+        // Append to history samples so charts stay live
+        const last = state.samples[state.samples.length - 1];
+        if (!last || sample.sampled_at !== last.sampled_at) {
+          state.samples.push(sample);
+          const cutoff = Date.now() - state.seconds * 1000;
+          state.samples = state.samples.filter(s => new Date(s.sampled_at).getTime() >= cutoff);
+          if (state.samples.length > 2000) {
+            state.samples = state.samples.slice(-2000);
+          }
+          scheduleChartRedraw();
+        }
+
         const isFirst = state.samples.length === 0;
-        if (!isFirst && oldConnected !== newConnected) {
-          // Trigger background history and chart refresh
-          refresh();
+        const shouldRefresh = !isFirst && oldConnected !== newConnected;
+        if (DEBUG) {
+          console.log(`[SSE] oldConnected=${oldConnected} newConnected=${newConnected} isFirst=${isFirst} shouldRefresh=${shouldRefresh}`, {
+            percent: sample.percent,
+            amperage_ma: sample.amperage_ma,
+            power_w: sample.power_w,
+            external_connected: sample.external_connected,
+          });
+        }
+        if (shouldRefresh) {
+          refresh("sse-power-change");
         }
       }
     } catch (e) {
@@ -1690,19 +1770,12 @@ function connectEvents() {
   };
 }
 
-function startCountdownCycle() {
-  refresh();
-  connectEvents();
-  countdownIntervalId = setInterval(() => {
-    if (secondsUntilNextPoll() === 0) {
-      refresh();
-    }
-  }, 1000);
-}
+connectEvents();
+refresh("init");
 
-startCountdownCycle();
+let subtitleIntervalId = setInterval(updateSubtitleAgo, 1000);
 
 window.addEventListener("beforeunload", () => {
-  if (countdownIntervalId) clearInterval(countdownIntervalId);
+  if (subtitleIntervalId) clearInterval(subtitleIntervalId);
   if (eventSource) eventSource.close();
 });

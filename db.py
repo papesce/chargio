@@ -89,10 +89,8 @@ def history_samples(path: Path, seconds: int) -> list[dict]:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT sampled_at, percent, voltage_mv, amperage_ma, instant_amperage_ma,
-                   power_w, system_power_w, system_load_w, is_charging,
-                   external_connected, temperature_c, adapter_watts,
-                   adapter_voltage_mv, adapter_current_ma, time_remaining_min
+            SELECT sampled_at, percent, power_w, system_power_w, is_charging,
+                   external_connected, temperature_c
             FROM battery_samples
             WHERE sampled_at >= ?
             ORDER BY sampled_at ASC

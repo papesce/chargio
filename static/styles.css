@@ -138,6 +138,15 @@ h2 {
   font-size: 14px;
 }
 
+#batteryRunningTime {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+  font-weight: 400;
+}
+
 #timeFooter {
   margin-top: 4px;
   font-size: 11px;
@@ -691,6 +700,8 @@ html {
 body {
   display: block;
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
   background:
     radial-gradient(circle at 18% 14%, rgba(88, 166, 255, 0.24), transparent 26vw),
     radial-gradient(circle at 82% 8%, rgba(74, 222, 128, 0.18), transparent 24vw),
