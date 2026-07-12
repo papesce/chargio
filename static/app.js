@@ -505,10 +505,20 @@ function formatTooltipText(point, canvasId, adapterPoints) {
     else if (state.focusedChart === "temp") suffix = " °C";
   }
   let result = `${time} · ${val}${suffix}`;
-  if ((canvasId === "powerChart" || (canvasId === "focusChartCanvas" && state.focusedChart === "power")) && adapterPoints) {
+  const isPowerChart = canvasId === "powerChart" || (canvasId === "focusChartCanvas" && state.focusedChart === "power");
+  if (isPowerChart && adapterPoints) {
     const adapterW = findNearestAdapterWatt(adapterPoints, point.x.getTime());
     if (adapterW !== null) {
       result += `  (adapter: ${adapterW.toFixed(0)} W)`;
+    }
+  }
+  if (isPowerChart) {
+    const data = chartDataCache[canvasId];
+    if (data && data.cpuPoints && data.cpuPoints.length > 0) {
+      const cpuVal = findNearestAdapterWatt(data.cpuPoints, point.x.getTime());
+      if (cpuVal !== null) {
+        result += `  cpu: ${cpuVal.toFixed(0)}%`;
+      }
     }
   }
   return result;
@@ -731,8 +741,9 @@ function expandTempPointsAtThreshold(points, threshold) {
   return out;
 }
 
-function drawPowerChart(canvasId, points, adapterPoints) {
+function drawPowerChart(canvasId, points, adapterPoints, cpuPoints) {
   adapterPoints = adapterPoints || [];
+  cpuPoints = cpuPoints || [];
   const canvas = $(canvasId);
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -745,7 +756,8 @@ function drawPowerChart(canvasId, points, adapterPoints) {
 
   const width = rect.width;
   const height = rect.height;
-  const pad = { top: 16, right: 18, bottom: 28, left: 48 };
+  const hasCpu = cpuPoints.length >= 2;
+  const pad = { top: 16, right: hasCpu ? 42 : 18, bottom: 28, left: 48 };
   ctx.clearRect(0, 0, width, height);
 
   const styles = getComputedStyle(document.documentElement);
@@ -754,6 +766,7 @@ function drawPowerChart(canvasId, points, adapterPoints) {
   const chargeRgb = themeRgb("--good");
   const dischargeRgb = themeRgb("--warn");
   const adapterRgb = themeRgb("--adapter");
+  const cpuRgb = themeRgb("--cpu");
 
   ctx.font = "12px system-ui, sans-serif";
   ctx.fillStyle = text;
@@ -919,7 +932,39 @@ function drawPowerChart(canvasId, points, adapterPoints) {
   ctx.textAlign = "right";
   ctx.fillText(last, width - pad.right, height - 8);
   ctx.textAlign = "left";
-  cacheChartData(canvasId, points, pad, plotW, plotH, minX, maxX, minY, maxY, { adapterPoints });
+  if (hasCpu) {
+    const cpuToPy = (v) => zeroY - (v / 100) * (zeroY - pad.top);
+    ctx.strokeStyle = rgba(cpuRgb, 0.85);
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 4]);
+    for (let i = 0; i < cpuPoints.length - 1; i += 1) {
+      const p0 = cpuPoints[i];
+      const p1 = cpuPoints[i + 1];
+      if (p1.x.getTime() - p0.x.getTime() > 300000) continue;
+      const x0 = xToPx(p0.x.getTime());
+      const y0 = cpuToPy(Number(p0.y));
+      const x1 = xToPx(p1.x.getTime());
+      const y1 = cpuToPy(Number(p1.y));
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = rgba(cpuRgb, 0.9);
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    for (let pct of [0, 25, 50, 75, 100]) {
+      const y = cpuToPy(pct);
+      ctx.fillText(`${pct}%`, width - pad.right + 4, y + 4);
+    }
+    ctx.textAlign = "left";
+    ctx.font = "12px system-ui, sans-serif";
+  }
+
+  cacheChartData(canvasId, points, pad, plotW, plotH, minX, maxX, minY, maxY, { adapterPoints, cpuPoints });
   drawHoverOnChart(canvasId, ctx, pad, plotW, plotH);
 }
 
@@ -1357,17 +1402,18 @@ function scheduleChartRedraw() {
 function updateCharts() {
   const powerPoints = series(state.samples, "power_w");
   const adapterPoints = adapterPowerSeries(state.samples);
-  drawPowerChart("powerChart", powerPoints, adapterPoints);
+  const cpuPoints = series(state.samples, "cpu_percent");
+  drawPowerChart("powerChart", powerPoints, adapterPoints, cpuPoints);
 
   const batteryPoints = batterySeries(state.samples);
   drawBatteryChart("percentChart", batteryPoints);
-  
+
   const tempPoints = series(state.samples, "temperature_c");
   drawTemperatureChart("tempChart", tempPoints);
 
   if (state.focusedChart) {
     if (state.focusedChart === 'power') {
-      drawPowerChart("focusChartCanvas", powerPoints, adapterPoints);
+      drawPowerChart("focusChartCanvas", powerPoints, adapterPoints, cpuPoints);
     } else if (state.focusedChart === 'temp') {
       drawTemperatureChart("focusChartCanvas", tempPoints);
     } else if (state.focusedChart === 'battery') {

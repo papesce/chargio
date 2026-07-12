@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS battery_samples (
   adapter_watts REAL,
   adapter_voltage_mv INTEGER,
   adapter_current_ma INTEGER,
-  time_remaining_min INTEGER
+  time_remaining_min INTEGER,
+  cpu_percent REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_battery_samples_sampled_at
@@ -55,6 +56,10 @@ ON session_summaries(started_at);
 def init_db(path: Path):
     with sqlite3.connect(path) as conn:
         conn.executescript(SCHEMA)
+        try:
+            conn.execute("ALTER TABLE battery_samples ADD COLUMN cpu_percent REAL")
+        except Exception:
+            pass
 
 
 def insert_sample(path: Path, sample: dict):
@@ -90,7 +95,7 @@ def history_samples(path: Path, seconds: int) -> list[dict]:
         rows = conn.execute(
             """
             SELECT sampled_at, percent, power_w, system_power_w, is_charging,
-                   external_connected, temperature_c
+                   external_connected, temperature_c, cpu_percent
             FROM battery_samples
             WHERE sampled_at >= ?
             ORDER BY sampled_at ASC

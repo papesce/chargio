@@ -2,6 +2,11 @@ import re
 import subprocess
 from datetime import datetime, timezone
 
+try:
+    import psutil as _psutil
+except ImportError:
+    _psutil = None
+
 
 BATTERY_FIELDS = {
     "TimeRemaining",
@@ -228,4 +233,5 @@ def collect_sample():
         "adapter_voltage_mv": int_or_none(adapter.get("AdapterVoltage")),
         "adapter_current_ma": int_or_none(adapter.get("Current")),
         "time_remaining_min": int_or_none(fields.get("AvgTimeToFull") or fields.get("TimeRemaining")),
+        "cpu_percent": _psutil.cpu_percent(interval=None) if _psutil else None,
     }
