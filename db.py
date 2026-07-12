@@ -105,3 +105,29 @@ def history_samples(path: Path, seconds: int) -> list[dict]:
 
     step = max(1, len(samples) // max_points)
     return samples[::step]
+
+
+def current_session_start(path: Path) -> dict | None:
+    """Return the sampled_at and external_connected of the first sample in the current unbroken session."""
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT MIN(sampled_at) AS session_started_at,
+                   external_connected AS session_type
+            FROM battery_samples
+            WHERE sampled_at > (
+                SELECT COALESCE(MAX(sampled_at), '1970-01-01')
+                FROM battery_samples
+                WHERE external_connected != (
+                    SELECT external_connected
+                    FROM battery_samples
+                    ORDER BY sampled_at DESC
+                    LIMIT 1
+                )
+            )
+            """
+        ).fetchone()
+    if row and row["session_started_at"]:
+        return {"session_started_at": row["session_started_at"], "session_type": bool(row["session_type"])}
+    return None

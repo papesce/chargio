@@ -22,6 +22,7 @@ const state = {
   lastSampleReceivedTime: Date.now(),
   subtitleBase: null,
   lastSampleTimestamp: null,
+  sessionStart: null,
 };
 
 const TEMP_COMFORT_MAX_C = 38;
@@ -115,7 +116,7 @@ function maxSampleGapMs(samples) {
   return maxGap;
 }
 
-function getUnpluggedStats(sample, samples) {
+function getUnpluggedStats(sample, samples, sessionStart = null) {
   if (!sample || sample.external_connected || sample.percent === null || sample.percent === undefined) {
     return null;
   }
@@ -133,17 +134,30 @@ function getUnpluggedStats(sample, samples) {
 
   if (unplugged.length < 2) return null;
 
-  const first = unplugged[0];
-  const last = unplugged[unplugged.length - 1];
-  const startMs = new Date(first.sampled_at).getTime();
-  const endMs = new Date(last.sampled_at).getTime();
-  const elapsedMinutes = (endMs - startMs) / 60000;
+  // Use DB-supplied session start for elapsed time when available and matching state
+  let elapsedMinutes;
+  if (sessionStart && sessionStart.session_type === false) {
+    const startMs = new Date(sessionStart.session_started_at).getTime();
+    const endMs = new Date(sample.sampled_at).getTime();
+    elapsedMinutes = (endMs - startMs) / 60000;
+  } else {
+    const first = unplugged[0];
+    const last = unplugged[unplugged.length - 1];
+    const startMs = new Date(first.sampled_at).getTime();
+    const endMs = new Date(last.sampled_at).getTime();
+    elapsedMinutes = (endMs - startMs) / 60000;
+  }
   if (!Number.isFinite(elapsedMinutes) || elapsedMinutes <= 0) return null;
 
+  // Discharge rate still computed from sample window (needs actual data points)
+  const first = unplugged[0];
+  const last = unplugged[unplugged.length - 1];
+  const windowMs = new Date(last.sampled_at).getTime() - new Date(first.sampled_at).getTime();
+  const windowMinutes = windowMs / 60000;
   const percentDrop = Number(first.percent) - Number(last.percent);
-  if (!Number.isFinite(percentDrop) || percentDrop <= 0) return null;
+  if (!Number.isFinite(percentDrop) || percentDrop <= 0 || windowMinutes <= 0) return null;
 
-  const dropPerMinute = percentDrop / elapsedMinutes;
+  const dropPerMinute = percentDrop / windowMinutes;
   if (!Number.isFinite(dropPerMinute) || dropPerMinute <= 0) return null;
 
   return {
@@ -152,12 +166,23 @@ function getUnpluggedStats(sample, samples) {
   };
 }
 
-function getConnectedStats(sample, samples) {
+function getConnectedStats(sample, samples, sessionStart = null) {
   if (!sample || !sample.external_connected) return null;
-  if (!Array.isArray(samples) || samples.length < 1) return null;
 
   const endMs = new Date(sample.sampled_at).getTime();
   if (!Number.isFinite(endMs)) return null;
+
+  // Use DB-supplied session start for accurate elapsed time when available
+  if (sessionStart && sessionStart.session_type === true) {
+    const startMs = new Date(sessionStart.session_started_at).getTime();
+    if (!Number.isFinite(startMs)) return null;
+    const elapsedMinutes = (endMs - startMs) / 60000;
+    if (!Number.isFinite(elapsedMinutes) || elapsedMinutes <= 0) return null;
+    return { elapsedMinutes: Math.round(elapsedMinutes) };
+  }
+
+  // Fallback: walk the sample window
+  if (!Array.isArray(samples) || samples.length < 1) return null;
 
   let startSample = null;
   for (let i = samples.length - 1; i >= 0; i--) {
@@ -260,7 +285,7 @@ function setBatterySaver(enabled, persist = true) {
   syncPowerFlowAnimationMode();
 }
 
-function updatePowerFlow(sample, samples) {
+function updatePowerFlow(sample, samples, sessionStart = null) {
   if (!sample) return;
 
   const wasPluggedIn = state.isPluggedIn;
@@ -274,14 +299,14 @@ function updatePowerFlow(sample, samples) {
     intensity = Math.min(Math.abs(sample.power_w) / 50, 2.0);
   }
 
-  const unpluggedStats = getUnpluggedStats(sample, samples);
+  const unpluggedStats = getUnpluggedStats(sample, samples, sessionStart);
   const unpluggedEstimate = unpluggedStats?.remainingMinutes ?? null;
   let bestTimeEstimate = sample.time_remaining_min;
   if (!sample.external_connected && unpluggedEstimate !== null) {
     bestTimeEstimate = unpluggedEstimate;
   }
 
-  const connectedStats = getConnectedStats(sample, samples);
+  const connectedStats = getConnectedStats(sample, samples, sessionStart);
 
   const nextFlowState = {
     isPluggedIn: sample.external_connected === 1 || sample.external_connected === true,
@@ -311,7 +336,7 @@ function updatePowerFlow(sample, samples) {
   syncPowerFlowAnimationMode();
 }
 
-function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
+function updateCurrent(sample, collectorError, collectorStatus, samples = [], sessionStart = null) {
   if (!sample) {
     $("subtitle").textContent = collectorError || "No samples yet";
     return;
@@ -320,7 +345,7 @@ function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   if (!state.powerFlowComponent) {
     initPowerFlow();
   }
-  updatePowerFlow(sample, samples);
+  updatePowerFlow(sample, samples, sessionStart);
 
   $("percent").textContent = fmt(sample.percent, "%", 1);
   $("state").textContent = sample.external_connected
@@ -337,7 +362,7 @@ function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   $("temperature").textContent = fmt(sample.temperature_c, " C", 1);
   $("cycles").textContent = `${fmtInt(sample.cycle_count)} cycles`;
   $("timeLabel").textContent = sample.external_connected ? "Time to full" : "Time remaining";
-  const unpluggedStats = getUnpluggedStats(sample, samples);
+  const unpluggedStats = getUnpluggedStats(sample, samples, sessionStart);
   const unpluggedEstimate = unpluggedStats?.remainingMinutes ?? null;
   if (!sample.external_connected) {
     const estimate = unpluggedEstimate ?? sample.time_remaining_min;
@@ -349,7 +374,7 @@ function updateCurrent(sample, collectorError, collectorStatus, samples = []) {
   } else {
     const label = minutesLabel(sample.time_remaining_min);
     $("remaining").textContent = label === "--" ? "…" : label;
-    const connectedStats = getConnectedStats(sample, samples);
+    const connectedStats = getConnectedStats(sample, samples, sessionStart);
     const connectedLabel = connectedStats ? formatDurationMs(connectedStats.elapsedMinutes * 60000) : "";
     $("batteryRunningTime").textContent = connectedLabel ? `Connected ${connectedLabel}` : "";
     $("batteryRunningTime").style.display = connectedLabel ? "" : "none";
@@ -1360,7 +1385,7 @@ function updateCharts() {
         intensity = Math.min(Math.abs(last.power_w) / 50, 2.0);
       }
 
-      const focusConnectedStats = getConnectedStats(last, state.samples);
+      const focusConnectedStats = getConnectedStats(last, state.samples, state.sessionStart);
 
       state.focusFlowComponent.setState({
         isPluggedIn: last.external_connected === 1 || last.external_connected === true,
@@ -1406,11 +1431,12 @@ async function refresh(trigger = "unknown") {
     ]);
     state.samples = history.samples || [];
     state.collectorStatus = current.collector_status ?? null;
+    state.sessionStart = current.session_start ?? null;
     state.lastSampleReceivedTime = Date.now();
     if (state.collectorStatus && state.collectorStatus.next_poll_in !== undefined) {
       state.nextPollIn = state.collectorStatus.next_poll_in;
     }
-    updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples);
+    updateCurrent(current.sample, current.collector_error, current.collector_status, state.samples, state.sessionStart);
     scheduleChartRedraw();
     state.lastRefreshTime = Date.now();
     if (DEBUG) {
@@ -1730,7 +1756,7 @@ function connectEvents() {
         }
         
         // Immediately update current metrics and animation states in the UI
-        updateCurrent(sample, null, collectorStatus, state.samples);
+        updateCurrent(sample, null, collectorStatus, state.samples, state.sessionStart);
 
         // Append to history samples so charts stay live
         const last = state.samples[state.samples.length - 1];

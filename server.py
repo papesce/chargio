@@ -14,7 +14,7 @@ import ctypes
 import ctypes.util
 
 from battery import collect_sample
-from db import history_samples, init_db, insert_sample, latest_sample
+from db import current_session_start, history_samples, init_db, insert_sample, latest_sample
 
 
 class Collector(threading.Thread):
@@ -206,6 +206,7 @@ class AppHandler(BaseHTTPRequestHandler):
             sample = live_sample or latest_sample(self.db_path)
             payload = {
                 "sample": sample,
+                "session_start": current_session_start(self.db_path),
                 "collector_error": self.collector.last_error if self.collector else None,
                 "collector_status": self.collector.status() if self.collector else None,
             }
