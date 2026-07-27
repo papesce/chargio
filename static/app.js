@@ -799,6 +799,12 @@ function drawPowerChart(canvasId, points, adapterPoints, cpuPoints) {
   maxY += yPad;
   minY = Math.min(minY, 0);
   maxY = Math.max(maxY, 0);
+  // When CPU data is shown, guarantee the 0 W line sits at least 30% from
+  // the top so the CPU % axis has readable space. maxY = 0.43*|minY| puts
+  // the zero line at ~30% from the top (zeroY/plotH = maxY/(maxY - minY)).
+  if (hasCpu) {
+    maxY = Math.max(maxY, Math.abs(minY) * 0.33);
+  }
 
   const xToPx = (t) => pad.left + ((t - minX) / Math.max(1, maxX - minX)) * plotW;
   const yToPy = (y) => pad.top + (1 - ((Number(y) - minY) / (maxY - minY))) * plotH;
@@ -933,7 +939,9 @@ function drawPowerChart(canvasId, points, adapterPoints, cpuPoints) {
   ctx.fillText(last, width - pad.right, height - 8);
   ctx.textAlign = "left";
   if (hasCpu) {
-    const cpuToPy = (v) => zeroY - (v / 100) * (zeroY - pad.top);
+    const MIN_CPU_HEIGHT = 60;
+    const cpuRangeTop = Math.min(pad.top, zeroY - MIN_CPU_HEIGHT);
+    const cpuToPy = (v) => zeroY - (v / 100) * (zeroY - cpuRangeTop);
     ctx.strokeStyle = rgba(cpuRgb, 0.85);
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 4]);
