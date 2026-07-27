@@ -3,3 +3,5 @@ battery.sqlite3
 __pycache__/
 .battery.pid
 plan/
+.venv/
+chargio.log

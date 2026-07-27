@@ -16,12 +16,53 @@ PORT="${CHARGIO_PORT:-7943}"
 URL="http://127.0.0.1:$PORT"
 INSTALL_DIR="${CHARGIO_INSTALL_DIR:-$HOME/.local/bin}"
 INSTALL_PATH="$INSTALL_DIR/chargio"
+VENV_DIR="$APP_DIR/.venv"
+VENV_PYTHON="$VENV_DIR/bin/python3"
+LOG_FILE="$APP_DIR/chargio.log"
+
+# Find a python3 >= 3.10, or print an install hint and exit.
+find_python() {
+  for cmd in python3 python3.13 python3.12 python3.11 python3.10; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+      if "$cmd" -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" 2>/dev/null; then
+        echo "$cmd"
+        return 0
+      fi
+    fi
+  done
+  echo ""
+  return 1
+}
 
 is_running() {
   [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
 }
 
-case "${1:-start}" in
+do_setup() {
+  PYTHON=$(find_python) || true
+  if [ -z "$PYTHON" ]; then
+    echo "Error: Python 3.10 or later is required but was not found."
+    echo ""
+    echo "Install it with one of:"
+    echo "  uv python install 3.13            # recommended: https://docs.astral.sh/uv/"
+    echo "  brew install python@3.13          # Homebrew (macOS)"
+    echo "  sudo apt install python3.13       # Debian/Ubuntu"
+    echo "  https://www.python.org/downloads/ # Official installer"
+    exit 1
+  fi
+  echo "Using $PYTHON ($(${PYTHON} --version))"
+  echo "Creating virtual environment at $VENV_DIR ..."
+  "$PYTHON" -m venv "$VENV_DIR"
+  echo "Installing dependencies ..."
+  "$VENV_DIR/bin/pip" install --quiet --upgrade pip
+  "$VENV_DIR/bin/pip" install --quiet -r "$APP_DIR/requirements.txt"
+  echo "Setup complete."
+}
+
+case "${1:-help}" in
+  setup)
+    do_setup
+    ;;
   start)
     if is_running; then
       echo "Already running (PID $(cat "$PID_FILE"))"
@@ -30,9 +71,22 @@ case "${1:-start}" in
       fi
       exit 0
     fi
-    python3 "$APP_DIR/chargio.py" --port "$PORT" > /dev/null 2>&1 &
-    echo $! > "$PID_FILE"
-    echo "Started (PID $!) -> $URL"
+    # Auto-setup venv if it doesn't exist yet
+    if [ ! -x "$VENV_PYTHON" ]; then
+      echo "Virtual environment not found — running setup first ..."
+      do_setup
+    fi
+    "$VENV_PYTHON" "$APP_DIR/chargio.py" --port "$PORT" >> "$LOG_FILE" 2>&1 &
+    PID=$!
+    echo $PID > "$PID_FILE"
+    # Wait briefly and confirm the process is still alive
+    sleep 1
+    if ! kill -0 "$PID" 2>/dev/null; then
+      rm -f "$PID_FILE"
+      echo "Failed to start — check $LOG_FILE for details"
+      exit 1
+    fi
+    echo "Started (PID $PID) -> $URL"
     if [ "$2" = "--open" ]; then
       open "$URL"
     fi
@@ -103,8 +157,27 @@ case "${1:-start}" in
       echo "No Chargio symlink found at $INSTALL_PATH"
     fi
     ;;
+  help)
+    echo "Usage: $0 {setup|start|stop|kill|restart|status|open|install-cli|uninstall-cli} [--open]"
+    echo ""
+    echo "Commands:"
+    echo "  setup          Create .venv and install dependencies (runs automatically on first start)"
+    echo "  start [--open] Start the server; opens the browser if --open is passed"
+    echo "  stop           Stop the server gracefully"
+    echo "  kill           Force-kill the server"
+    echo "  restart        Stop then start"
+    echo "  status         Show whether the server is running"
+    echo "  open           Open the UI in the browser (starts server if needed)"
+    echo "  install-cli    Symlink this script to $INSTALL_DIR"
+    echo "  uninstall-cli  Remove the symlink from $INSTALL_DIR"
+    echo ""
+    echo "Python 3.10+ is required. Recommended installer: https://docs.astral.sh/uv/"
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo "  uv python install 3.13"
+    exit 0
+    ;;
   *)
-    echo "Usage: $0 {start|stop|kill|restart|status|open|install-cli|uninstall-cli} [--open]"
+    echo "Usage: $0 {setup|start|stop|kill|restart|status|open|install-cli|uninstall-cli} [--open]"
     exit 1
     ;;
 esac
